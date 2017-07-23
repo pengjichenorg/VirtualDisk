@@ -29,7 +29,7 @@ public:
      * @param parent read
      */
     // TODO: use weak_ptr
-    void setNTreeParent(NTree* parent);
+    void setNTreeParent(const NTree* parent);
 
     /**
      * get this tree's parent
@@ -86,7 +86,7 @@ public:
 
 private:
     std::shared_ptr<T> m_treeInfo = nullptr;
-    NTree* m_parent = nullptr;
+    const NTree* m_parent = nullptr;
     std::vector<std::shared_ptr<T>> m_treeValue;
     std::vector<std::shared_ptr<NTree>> m_children;
 
@@ -108,7 +108,7 @@ const std::shared_ptr<T> NTree<T>::getNTreeInfo() const {
 }
 
 template <typename T>
-void NTree<T>::setNTreeParent(NTree* parent) {
+void NTree<T>::setNTreeParent(const NTree* parent) {
     m_parent = parent;
 }
 
@@ -139,7 +139,7 @@ void NTree<T>::addNTreeChild(std::shared_ptr<NTree> child) {
 }
 
 template <typename T>
-void NTree<T>::removeNTreeChild(std::shared_ptr<NTree<T>> child) {
+void NTree<T>::removeNTreeChild(std::shared_ptr<NTree> child) {
     m_children.erase(std::find(m_children.begin(), m_children.end(), child));
 }
 
@@ -154,7 +154,7 @@ bool NTree<T>::operator==(const NTree<T>& ntree) {
 }
 
 template <typename T>
-bool NTree<T>::operator== (const std::shared_ptr<NTree<T>> ntree) {
+bool NTree<T>::operator== (const std::shared_ptr<NTree> ntree) {
     return *m_treeInfo == *(ntree->m_treeInfo);
 }
 
@@ -175,5 +175,3 @@ void traversalNTree(std::shared_ptr<NTree<T>> ntree) {
         traversalNTree(child);
     }
 }
-
-// QUESTION: 1
