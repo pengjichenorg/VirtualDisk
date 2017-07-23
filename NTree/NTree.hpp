@@ -29,13 +29,19 @@ public:
      * @param parent read
      */
     // TODO: use weak_ptr
-    void setNTreeParent(const NTree* parent);
+    void setNTreeParent(NTree* parent);
 
     /**
      * get this tree's parent
      * @param value read
      */
-    const NTree* getParent() const;
+    // const NTree* getParent() const;
+
+    /**
+     * get this tree's parent
+     * @return read/write
+     */
+    NTree* getParent();
 
     /**
      * add this tree's value
@@ -86,7 +92,7 @@ public:
 
 private:
     std::shared_ptr<T> m_treeInfo = nullptr;
-    const NTree* m_parent = nullptr;
+    NTree<T>* m_parent = nullptr;
     std::vector<std::shared_ptr<T>> m_treeValue;
     std::vector<std::shared_ptr<NTree>> m_children;
 
@@ -108,12 +114,17 @@ const std::shared_ptr<T> NTree<T>::getNTreeInfo() const {
 }
 
 template <typename T>
-void NTree<T>::setNTreeParent(const NTree* parent) {
+void NTree<T>::setNTreeParent(NTree<T>* parent) {
     m_parent = parent;
 }
 
+// template <typename T>
+// const NTree<T>* NTree<T>::getParent() const {
+//     return m_parent;
+// }
+
 template <typename T>
-const NTree<T>* NTree<T>::getParent() const {
+NTree<T>* NTree<T>::getParent() {
     return m_parent;
 }
 

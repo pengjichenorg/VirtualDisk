@@ -6,16 +6,39 @@
 
 class StringParser {
 public:
+    /**
+     * get string parser instance
+     * @return instance
+     */
     static StringParser* getInstance();
+
+    /**
+     * destory string parser instance
+     */
     static void destoryInstance();
+
+    /**
+     * parse string
+     * @param str read
+     */
     void parseString(const std::string& str);
+
+    /**
+     * output parse result for test
+     */
     void parseResult() const;
+
+    /**
+     * clear parse result for next parsing
+     */
     void clear();
 
 private:
+    /**
+     * private constructor for singleton pattern
+     */
     StringParser();
     static StringParser* m_instance;
-    void parse();
     std::string command;
     std::vector<std::string> arguments;
     std::vector<std::string> targets;

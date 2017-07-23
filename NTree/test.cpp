@@ -2,6 +2,7 @@
 #include "../Timer.hpp"
 #include <iostream>
 #include <cassert>
+#include <typeinfo>
 
 /**
  * test NTree as like as follow:
@@ -75,5 +76,15 @@ int main(int argc, char* argv[])
     ntree->addNTreeChild(ntree_F);
 
     traversalNTree(ntree);
+
+    NTree<int>* tree = ntree_D_C.get();
+    std::cout << "traversal from D:C/" << std::endl;
+    do {
+        std::cout << *(tree->getNTreeInfo()) << std::endl;
+        for(auto value : tree->getNTreeValue()) {
+            std::cout << *value << std::endl;
+        }
+        tree = tree->getParent();
+    } while(*(tree->getNTreeInfo()) != 0);
     return 0;
 }
