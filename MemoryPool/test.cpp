@@ -6,8 +6,7 @@ public:
     int m_int = -1;
 };
 
-int main(int argc, char* argv[])
-{
+void testAny() {
     Any n0 = std::string("strng object");
     std::cout << n0.cast<std::string>() << std::endl;
 
@@ -16,6 +15,11 @@ int main(int argc, char* argv[])
 
     Any n2 = A();
     std::cout << n2.cast<A>().m_int << std::endl;
+}
+
+int main(int argc, char* argv[])
+{
+
 
     return 0;
 }
