@@ -33,12 +33,6 @@ public:
 
     /**
      * get this tree's parent
-     * @param value read
-     */
-    // const NTree* getParent() const;
-
-    /**
-     * get this tree's parent
      * @return read/write
      */
     NTree* getParent();
@@ -117,11 +111,6 @@ template <typename T>
 void NTree<T>::setNTreeParent(NTree<T>* parent) {
     m_parent = parent;
 }
-
-// template <typename T>
-// const NTree<T>* NTree<T>::getParent() const {
-//     return m_parent;
-// }
 
 template <typename T>
 NTree<T>* NTree<T>::getParent() {

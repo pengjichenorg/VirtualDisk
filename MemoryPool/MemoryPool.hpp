@@ -2,7 +2,7 @@
 
 #include <memory>
 
-const size_t memoryPoolSize = 1024;
+const size_t memoryPoolSize = 128;
 
 class MemoryPool {
 public:
