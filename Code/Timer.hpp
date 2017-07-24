@@ -1,5 +1,4 @@
-#ifndef __TIMER_HPP__
-#define __TIMER_HPP__
+#pragma once
 
 #include <chrono>
 
@@ -46,5 +45,3 @@ public:
 private:
     time_point<high_resolution_clock> m_begin;
 };
-
-#endif

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <memory>
-#include "Any.hpp"
+#include "File.hpp"
 
 const size_t memoryPoolSize = 128;
 
@@ -32,7 +32,8 @@ private:
     ~MemoryPool();
 
     static MemoryPool* m_instance;
-
+    std::allocator<File> m_allocator;
+    void* m_startPtr = nullptr;
 };
 
 MemoryPool* MemoryPool::m_instance = nullptr;
@@ -52,7 +53,7 @@ void MemoryPool::destoryInstance() {
 }
 
 MemoryPool::MemoryPool() {
-
+    m_startPtr = m_allocator.allocate(memoryPoolSize);
 }
 
 MemoryPool::~MemoryPool() {

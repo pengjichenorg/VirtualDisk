@@ -1,3 +1,6 @@
+#pragma once
+
+#include <map>
 #include <iostream>
 #include <vector>
 #include <memory>
@@ -5,7 +8,7 @@
 #include <cassert>
 
 template <typename T>
-class NTree /* : public std::enable_shared_from_this<NTree<T>> */ {
+class NTree {
 public:
     /**
      * empty constructor
@@ -89,7 +92,9 @@ private:
     NTree<T>* m_parent = nullptr;
     std::vector<std::shared_ptr<T>> m_treeValue;
     std::vector<std::shared_ptr<NTree>> m_children;
-
+    // restruct
+    std::map<std::string, NTree<T>*> m_childrenMap;
+    T m_value;
 };
 
 template <typename T>

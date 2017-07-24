@@ -1,3 +1,5 @@
+#pragma once
+
 #include <iostream>
 #include <string>
 #include <vector>
@@ -14,12 +16,12 @@ public:
     virtual void printResult();
 
     std::string path;
-    typedef std::tuple<std::string, std::string, std::string, std::string, std::string> Element;
+    typedef std::tuple<std::string, std::string, std::string, std::string> Element;
     std::vector<Element> m_elements;
 };
 
 CommandDIRPrinter::CommandDIRPrinter() {
-    
+
 }
 
 void CommandDIRPrinter::printResult() {
