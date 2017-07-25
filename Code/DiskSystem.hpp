@@ -4,6 +4,7 @@
 #include <memory>
 #include <unordered_map>
 
+#include "NTree.hpp"
 #include "DiskPartition.hpp"
 
 const size_t diskSize = 128;
@@ -19,20 +20,23 @@ const std::string initPartition = "C:";
 class DiskSystem {
 public:
     static DiskSystem* getInstance();
+    static void destoryInstance();
     std::string getCurrentPath();
-    std::shared_ptr<NTree<File>> getCurrentPartition();
-    void setCurrentNode(std::shared_ptr<NTree<File>> node);
-    std::shared_ptr<NTree<File>> getCurrentNode();
-    std::shared_ptr<NTree<File>> findNode();
+    void setCurrentNode(NTree<File>* node);
+    NTree<File>* getCurrentNode();
+    DiskPartition* getCurrentPartition();
+    void setCurrentPartition(std::string partition);
+
+    NTree<File>* findDirectory(std::string fileName);
 
 private:
     DiskSystem();
-    void calculateCurrentPath();
     static DiskSystem* m_instance;
     std::unordered_map<std::string, DiskPartition> m_partitions;
+    DiskPartition* m_currentPartition = nullptr;
+    NTree<File>* m_currentNode = nullptr;
+    NTree<File>* m_rootNode = nullptr;
     std::string m_currentPath;
-    std::shared_ptr<NTree<File>> m_currentPartition;
-    std::shared_ptr<NTree<File>> m_currentNode;
 
 };
 
@@ -45,40 +49,50 @@ DiskSystem* DiskSystem::getInstance() {
     return m_instance;
 }
 
-std::shared_ptr<NTree<File>> DiskSystem::getCurrentPartition() {
-    return m_currentPartition;
-}
+void DiskSystem::destoryInstance() {
 
-std::string DiskSystem::getCurrentPath() {
-    return m_currentPath;
-}
-
-void DiskSystem::setCurrentNode(std::shared_ptr<NTree<File>> node) {
-    m_currentNode = node;
-    calculateCurrentPath();
-}
-
-std::shared_ptr<NTree<File>> DiskSystem::getCurrentNode() {
-    return m_currentNode;
 }
 
 DiskSystem::DiskSystem() {
+    // create NTree node for root
+    m_rootNode = new NTree<File>(File("root:", FileType::directoryFile));
     for(auto index = 0; index != partitionSize; index++) {
+        // create NTree node for parition
+        NTree<File>* paritionNode = new NTree<File>(File(partitionName[index], FileType::directoryFile));
+        m_rootNode->addNTreeChild(paritionNode);
+        // allocate memory
         void* startPtr = malloc(diskSize);
-        m_partitions.emplace(partitionName[index], DiskPartition(partitionName[index], startPtr));
+        m_partitions.emplace(partitionName[index], DiskPartition(paritionNode, startPtr));
     }
+    m_currentPartition = &m_partitions[initPartition];
     m_currentNode = m_partitions[initPartition].getNTree();
-    m_currentPartition = m_currentNode;
-    calculateCurrentPath();
+    m_currentPath = m_currentPartition->getFullPath(m_currentNode);
 }
 
-void DiskSystem::calculateCurrentPath() {
-    NTree<File>* tree = m_currentNode.get();
-    do {
-        m_currentPath = tree->getNTreeInfo()->getFileName() + m_currentPath;
-        for(auto value : tree->getNTreeValue()) {
-            m_currentPath = value->getFileName() + " " + m_currentPath;
-        }
-        tree = tree->getParent();
-    } while(tree != nullptr && tree->getNTreeInfo()->getFileName() != std::string("root:"));
+std::string DiskSystem::getCurrentPath() {
+    m_currentPartition->getFullPath(m_currentNode);
+    return m_currentPath;
+}
+
+void DiskSystem::setCurrentNode(NTree<File>* node) {
+    m_currentNode = node;
+}
+
+NTree<File>* DiskSystem::getCurrentNode() {
+    return m_currentNode;
+}
+
+DiskPartition* DiskSystem::getCurrentPartition() {
+    return m_currentPartition;
+}
+
+void DiskSystem::setCurrentPartition(std::string partition = initPartition) {
+    m_currentPartition = &m_partitions[partition];
+}
+
+NTree<File>* DiskSystem::findDirectory(std::string fileName) {
+
+    // if() {
+
+    // }
 }

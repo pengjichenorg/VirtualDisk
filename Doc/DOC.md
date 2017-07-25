@@ -640,6 +640,13 @@ Disk Module 序列化与反序列化的必要数据是什么？
 
 # 命令实现
 
+- 对于路径的处理方式
+采用自定义路径加法：
+- 当前路径遇“\\”回到当前盘符根目录
+- 当前路径遇“..”退回上一级目录
+- 当前路径遇“.”不变化
+- 当前路径遇非以上内容则搜索当前路径子目录
+
 - mkdir
 各种使用形式：
 ```
@@ -671,6 +678,10 @@ mkdir folder\folder // 在当前目录（通过 DiskSystem 获得）下的 folde
 - Command
 - StringParser 类
 - NTree 类
+
+- 相关重构类
+    - DiskSystem
+    - DiskPartition
 
 ## 重构原因
 

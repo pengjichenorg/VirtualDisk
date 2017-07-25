@@ -31,6 +31,10 @@ public:
      */
      File(File&& file);
 
+     ~File();
+
+     std::string getPath() const;
+
      std::string getFileName() const;
 
      std::string getFileDate() const;
@@ -40,6 +44,11 @@ public:
      FileType getFileType() const;
 
      size_t getFileSize() const;
+
+     /*
+      * operator=
+      */
+     File& operator= (const File& file);
 
      /**
       * operator==
@@ -52,6 +61,7 @@ public:
       friend std::ostream& operator<< (std::ostream& os, const File& file);
 
 private:
+    std::string m_path;
     std::string m_name;
     std::string m_date;
     std::string m_time;
@@ -85,6 +95,7 @@ File::File(std::string name, FileType type = FileType::generalFile) {
 }
 
 File::File(const File& file) {
+    m_path = file.m_path;
     m_name = file.m_name;
     m_date = file.m_date;
     m_time = file.m_time;
@@ -93,11 +104,20 @@ File::File(const File& file) {
 }
 
 File::File(File&& file) {
+    m_path = file.m_path;
     m_name = file.m_name;
     m_date = file.m_date;
     m_time = file.m_time;
     m_type = file.m_type;
     m_size = file.m_size;
+}
+
+File::~File() {
+
+}
+
+std::string File::getPath() const {
+    return m_path;
 }
 
 std::string File::getFileName() const {
@@ -118,6 +138,17 @@ FileType File::getFileType() const {
 
 size_t File::getFileSize() const {
     return m_size;
+}
+
+File& File::operator= (const File& file) {
+    if(this != &file) {
+        m_name = file.m_name;
+        m_date = file.m_date;
+        m_time = file.m_time;
+        m_type = file.m_type;
+        m_size = file.m_size;
+    }
+    return *this;
 }
 
 bool File::operator== (const File& file) {

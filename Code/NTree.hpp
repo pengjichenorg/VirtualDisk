@@ -1,182 +1,84 @@
 #pragma once
 
 #include <map>
+#include <string>
 #include <iostream>
-#include <vector>
-#include <memory>
-#include <algorithm>
-#include <cassert>
 
 template <typename T>
 class NTree {
 public:
-    /**
-     * empty constructor
-     */
-    NTree(std::shared_ptr<T> info);
-
-    /**
-     * set this tree's info
-     * @param info read
-     */
-    void setNTreeInfo(std::shared_ptr<T> info);
-
-    /**
-     * get this tree's info
-     * @return read
-     */
-    const std::shared_ptr<T> getNTreeInfo() const;
-
-    /**
-     * set this tree's parent
-     * @param parent read
-     */
-    // TODO: use weak_ptr
-    void setNTreeParent(NTree* parent);
-
-    /**
-     * get this tree's parent
-     * @return read/write
-     */
-    NTree* getParent();
-
-    /**
-     * add this tree's value
-     * @param value read
-     */
-    void addNTreeValue(std::shared_ptr<T> value);
-
-    /**
-     * remove this tree's value
-     * @param value read
-     */
-    void removeNTreeValue(std::shared_ptr<T> value);
-
-    /**
-     * get tree value vector
-     */
-    const std::vector<std::shared_ptr<T>>& getNTreeValue() const;
-
-    /**
-     * add this tree's child
-     * @param child read
-     */
-    void addNTreeChild(std::shared_ptr<NTree> child);
-
-    /**
-     * remove this tree's child
-     * @param child read
-     */
-    void removeNTreeChild(std::shared_ptr<NTree> child);
-
-    /**
-     * get children vector
-     *
-     */
-    const std::vector<std::shared_ptr<NTree>>& getChildren() const;
-
-    /**
-     * operator== with const lvalue
-     * need type T provide operator== function
-     */
-    bool operator== (const NTree& ntree);
-
-    /**
-     * operator== with const shared_ptr
-     * need type T provide operator== function
-     */
-    bool operator== (const std::shared_ptr<NTree> ntree);
+    NTree();
+    NTree(const T& value); // lvalue
+    NTree(T&& value); // rvalue
+    ~NTree();
+    void setNTreeValue(T value);
+    T getNTreeValue();
+    void setNTreeParent(NTree<T>* ntree);
+    NTree<T>* getNTreeParent();
+    void addNTreeChild(NTree<T>* ntree);
+    void removeNTreeChild(std::string child);
+    std::map<std::string, NTree<T>*>& getNTreeChildren();
 
 private:
-    std::shared_ptr<T> m_treeInfo = nullptr;
-    NTree<T>* m_parent = nullptr;
-    std::vector<std::shared_ptr<T>> m_treeValue;
-    std::vector<std::shared_ptr<NTree>> m_children;
-    // restruct
-    std::map<std::string, NTree<T>*> m_childrenMap;
     T m_value;
+    NTree<T>* m_parent;
+    std::map<std::string, NTree<T>*> m_children;
 };
 
 template <typename T>
-NTree<T>::NTree(std::shared_ptr<T> treeInfo) {
-    m_treeInfo = treeInfo;
+NTree<T>::NTree() {
+
 }
 
 template <typename T>
-void NTree<T>::setNTreeInfo(std::shared_ptr<T> treeInfo) {
-    m_treeInfo = treeInfo;
+NTree<T>::NTree(const T& value):m_value(value) {
+
 }
 
 template <typename T>
-const std::shared_ptr<T> NTree<T>::getNTreeInfo() const {
-    return m_treeInfo;
+NTree<T>::NTree(T&& value):m_value(value) {
+
 }
 
 template <typename T>
-void NTree<T>::setNTreeParent(NTree<T>* parent) {
-    m_parent = parent;
+NTree<T>::~NTree() {
+    // delete value
+    // delete children
+    for(auto it = m_children.begin(); it != m_children.end(); it++) {
+        delete it->second;
+        it->second = nullptr;
+    }
 }
 
 template <typename T>
-NTree<T>* NTree<T>::getParent() {
+void NTree<T>::setNTreeValue(T value) {
+    m_value = value;
+}
+
+template <typename T>
+T NTree<T>::getNTreeValue() {
+    return m_value;
+}
+
+template <typename T>
+void NTree<T>::setNTreeParent(NTree<T>* ntree) {
+    m_parent = ntree;
+}
+
+template <typename T>
+NTree<T>* NTree<T>::getNTreeParent() {
     return m_parent;
 }
 
+// TODO: need template specialization for T*
 template <typename T>
-void NTree<T>::addNTreeValue(std::shared_ptr<T> value) {
-    m_treeValue.push_back(value);
+void NTree<T>::addNTreeChild(NTree<T>* ntree) {
+    ntree->setNTreeParent(this);
+    auto key = ntree->getNTreeValue().getFileName();
+    m_children.emplace(key, ntree);
 }
 
 template <typename T>
-void NTree<T>::removeNTreeValue(std::shared_ptr<T> value) {
-    m_treeValue.erase(std::find(m_treeValue.begin(), m_treeValue.end(), value));
-}
-
-template <typename T>
-const std::vector<std::shared_ptr<T>>& NTree<T>::getNTreeValue() const {
-    return m_treeValue;
-}
-
-template <typename T>
-void NTree<T>::addNTreeChild(std::shared_ptr<NTree> child) {
-    child->setNTreeParent(this);
-    m_children.push_back(child);
-}
-
-template <typename T>
-void NTree<T>::removeNTreeChild(std::shared_ptr<NTree> child) {
-    m_children.erase(std::find(m_children.begin(), m_children.end(), child));
-}
-
-template <typename T>
-const std::vector<std::shared_ptr<NTree<T>>>& NTree<T>::getChildren() const {
+std::map<std::string, NTree<T>*>& NTree<T>::getNTreeChildren() {
     return m_children;
-}
-
-template <typename T>
-bool NTree<T>::operator==(const NTree<T>& ntree) {
-    return *m_treeInfo == *ntree.m_treeInfo;
-}
-
-template <typename T>
-bool NTree<T>::operator== (const std::shared_ptr<NTree> ntree) {
-    return *m_treeInfo == *(ntree->m_treeInfo);
-}
-
-template <typename T>
-void traversalNTree(std::shared_ptr<NTree<T>> ntree) {
-    std::cout << "tree info:" << std::endl;
-    auto ntreeInfoSptr = ntree->getNTreeInfo();
-    assert(ntreeInfoSptr != nullptr);
-    std::cout << *ntreeInfoSptr << std::endl;
-    std::cout << "tree value:" << std::endl;
-    for(auto value : ntree->getNTreeValue()) {
-        std::cout << *value << std::endl;
-    }
-    if(ntree->getChildren().empty()) {
-        return;
-    }
-    for(auto child : ntree->getChildren()) {
-        traversalNTree(child);
-    }
 }

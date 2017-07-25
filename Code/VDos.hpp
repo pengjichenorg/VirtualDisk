@@ -2,6 +2,8 @@
 
 #include "StringParser.hpp"
 #include "Command.hpp"
+#include "DiskPartition.hpp"
+#include "DiskSystem.hpp"
 
 #include <iostream>
 #include <memory>
@@ -30,7 +32,10 @@ void VDos::run() {
         std::cout << DiskSystem::getInstance()->getCurrentPath();
         // input command
         std::string inputString;
+        std::cin.sync(); // clear buffer
         std::getline(std::cin, inputString);
+        std::cout << "inputString:" << inputString << std::endl;
+        std::cout << "Here" << std::endl;
 
         // parse input string as command
         StringParser::getInstance()->parseString(inputString);

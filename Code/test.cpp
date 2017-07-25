@@ -1,86 +1,104 @@
-#include "DiskSystem.hpp"
+// #include "DiskSystem.hpp"
 
 #include "NTree.hpp"
 #include "File.hpp"
-
 #include "VDos.hpp"
 
+#include <cassert>
 #include <cstdlib>
+#include <functional>
 
 void testFileInNTree() {
-    // /
-    std::shared_ptr<File> treeInfo_Root(new File("root:", FileType::directoryFile));
-    std::shared_ptr<NTree<File>> ntree(new NTree<File>(treeInfo_Root));
+    // root:
+    NTree<File>* dirRootNTree = new NTree<File>(File("root:", FileType::directoryFile));
 
     // C:
-    std::shared_ptr<File> treeInfo_C(new File("C:", FileType::directoryFile));
-    std::shared_ptr<NTree<File>> ntree_C(new NTree<File>(treeInfo_C));
+    NTree<File>* dirCNTree = new NTree<File>(File("C:", FileType::directoryFile));
+    dirRootNTree->addNTreeChild(dirCNTree);
 
     // C:\A
-    std::shared_ptr<File> treeInfo_C_A(new File("\\A", FileType::directoryFile));
-    std::shared_ptr<NTree<File>> ntree_C_A(new NTree<File>(treeInfo_C_A));
-    ntree_C->addNTreeChild(ntree_C_A);
-    // C:1.txt
-    std::shared_ptr<File> treeInfo_C_1TXT(new File("1.txt"));
-    ntree_C->addNTreeValue(treeInfo_C_1TXT);
-    // C:\B
-    std::shared_ptr<File> treeInfo_C_B(new File("\\B", FileType::directoryFile));
-    std::shared_ptr<NTree<File>> ntree_C_B(new NTree<File>(treeInfo_C_B));
-    ntree_C->addNTreeChild(ntree_C_B);
+    NTree<File>* dirC_ANTree = new NTree<File>(File("\\A", FileType::directoryFile));
+    dirCNTree->addNTreeChild(dirC_ANTree);
 
-    ntree->addNTreeChild(ntree_C);
+    // C:1.txt
+    NTree<File>* dirC_1TXTNode = new NTree<File>(File("1.txt"));
+    dirCNTree->addNTreeChild(dirC_1TXTNode);
+
+    // C:\B
+    NTree<File>* dirC_BNTree = new NTree<File>(File("\\B", FileType::directoryFile));
+    dirCNTree->addNTreeChild(dirC_BNTree);
 
     // D:
-    std::shared_ptr<File> treeInfo_D(new File("D:", FileType::directoryFile));
-    std::shared_ptr<NTree<File>> ntree_D(new NTree<File>(treeInfo_D));
+    NTree<File>* dirDNTree = new NTree<File>(File("D:", FileType::directoryFile));
+    dirRootNTree->addNTreeChild(dirDNTree);
 
     // D:\C
-    std::shared_ptr<File> treeInfo_D_C(new File("\\C", FileType::directoryFile));
-    std::shared_ptr<NTree<File>> ntree_D_C(new NTree<File>(treeInfo_D_C));
-    ntree_D->addNTreeChild(ntree_D_C);
-    // D:\E
-    std::shared_ptr<File> treeInfo_D_E(new File("\\E", FileType::directoryFile));
-    std::shared_ptr<NTree<File>> ntree_D_E(new NTree<File>(treeInfo_D_E));
-    ntree_D->addNTreeChild(ntree_D_E);
+    NTree<File>* dirD_CNTree = new NTree<File>(File("\\C", FileType::directoryFile));
+    dirDNTree->addNTreeChild(dirD_CNTree);
 
-    ntree->addNTreeChild(ntree_D);
+    // D:\D
+    NTree<File>* dirD_DNTree = new NTree<File>(File("\\D", FileType::directoryFile));
+    dirDNTree->addNTreeChild(dirD_DNTree);
+
+    // D:\E
+    NTree<File>* dirD_ENTree = new NTree<File>(File("\\E", FileType::directoryFile));
+    dirDNTree->addNTreeChild(dirD_ENTree);
 
     // E:
-    std::shared_ptr<File> treeInfo_E(new File("E:", FileType::directoryFile));
-    std::shared_ptr<NTree<File>> ntree_E(new NTree<File>(treeInfo_E));
+    NTree<File>* dirENTree = new NTree<File>(File("E:", FileType::directoryFile));
+    dirRootNTree->addNTreeChild(dirENTree);
 
     // E:2.txt
-    std::shared_ptr<File> treeInfo_E_2TXT(new File("2.txt"));
-    ntree_E->addNTreeValue(treeInfo_E_2TXT);
-    // E:3.txt
-    std::shared_ptr<File> treeInfo_E_3TXT(new File("3.txt"));
-    ntree_E->addNTreeValue(treeInfo_E_3TXT);
+    NTree<File>* dirE_2TXTNode = new NTree<File>(File("2.txt"));
+    dirENTree->addNTreeChild(dirE_2TXTNode);
 
-    ntree->addNTreeChild(ntree_E);
+    // E:3.txt
+    NTree<File>* dirE_3TXTNode = new NTree<File>(File("3.txt"));
+    dirENTree->addNTreeChild(dirE_3TXTNode);
 
     // F:
-    std::shared_ptr<File> treeInfo_F(new File("F:", FileType::directoryFile));
-    std::shared_ptr<NTree<File>> ntree_F(new NTree<File>(treeInfo_F));
+    NTree<File>* dirFNTree = new NTree<File>(File("F:", FileType::directoryFile));
+    dirRootNTree->addNTreeChild(dirFNTree);
 
-    ntree->addNTreeChild(ntree_F);
-
-    traversalNTree(ntree);
-
-    NTree<File>* tree = ntree_D_C.get();
-    std::cout << "traversal from D:\\C" << std::endl;
-    std::string path;
-    do {
-        path = tree->getNTreeInfo()->getFileName() + path;
-        for(auto value : tree->getNTreeValue()) {
-            path = value->getFileName() + " " + path;
+    // traversal function
+    std::function<void(NTree<File>*)> traversal = [&traversal](NTree<File>* ntree) {
+        std::cout << ntree->getNTreeValue() << std::endl;
+        if(ntree->getNTreeChildren().empty()) {
+            return;
         }
-        tree = tree->getParent();
-    } while(tree->getNTreeInfo()->getFileName() != std::string("root:"));
+        for(auto child = ntree->getNTreeChildren().begin(); child != ntree->getNTreeChildren().end(); child++) {
+            // std::cout << child->first << std::endl;
+            traversal(child->second);
+        }
+    };
+    // traversal from root
+    traversal(dirRootNTree);
+
+    // get full path from D:\E
+    std::string path;
+    auto node = dirD_ENTree;
+    while(node != nullptr) {
+        path = node->getNTreeValue().getFileName() + path;
+        node = node->getNTreeParent();
+    };
     std::cout << path << std::endl;
+
+    // delete test
+    delete dirRootNTree;
 }
 
 int main(int argc, char const *argv[]) {
     VDos vdos;
     vdos.run();
+
+    // std::string cmd1 = "cmd f1\\f2";
+    // std::string cmd2 = "cmd .\\f1\\f2";
+    // std::string cmd3 = "cmd ..\\f1\\f2";
+    // std::string cmd4 = "cmd \\f1\\f2";
+    // std::cout << cmd1.find("\\") << std::endl;
+    // std::cout << cmd2.find(".") << std::endl;
+    // std::cout << cmd3.find("..") << std::endl;
+    // std::cout << cmd4.find("\\") << std::endl;
+
     return 0;
 }
