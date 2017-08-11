@@ -2,13 +2,15 @@
 #include "CommandFactory.h"
 #include "ErrorMessage.h"
 
-#include "GeneralFile.h"
+#include "BinaryFile.h"
+
+#include <cassert>
 
 Msg TOUCHCommand(queue<Object> objects)
 {
 	if (objects.empty())
 	{
-		return Msg(false, errorSyntaxMessage, nullptr);
+		return Msg(false, errorSyntaxMessage, stack<File*>());
 	}
 
 	vector<Object> touchObjects;
@@ -16,14 +18,20 @@ Msg TOUCHCommand(queue<Object> objects)
 	while (!objects.empty())
 	{
 		auto object = objects.front();
-
-		if (object.m_file != nullptr)
+		auto currentDirectoryCopy = object.m_currentDirectory;
+		// NOTE: for only C: in currentDirectory
+		if (currentDirectoryCopy.size() != 1)
 		{
-			return Msg(false, errorExistMessage, nullptr);
+			currentDirectoryCopy.pop();
 		}
-		else if (object.m_fileParent == nullptr)
+
+		if (object.m_currentDirectory.top() != nullptr)
 		{
-			return Msg(false, errorDirMessage, nullptr);
+			return Msg(false, errorExistMessage, stack<File*>());
+		}
+		else if (currentDirectoryCopy.top() == nullptr)
+		{
+			return Msg(false, errorDirMessage, stack<File*>());
 		}
 		else
 		{
@@ -35,8 +43,14 @@ Msg TOUCHCommand(queue<Object> objects)
 	for (auto object : touchObjects)
 	{
 		auto name = object.m_path.m_pathQueue.back();
-		auto dir = static_cast<DirectoryFile*>(object.m_fileParent);
-		dir->addChild(new GeneralFile(name));
+		auto currentDirectoryCopy = object.m_currentDirectory;
+		// NOTE: for only C: in currentDirectory
+		if (currentDirectoryCopy.size() != 1)
+		{
+			currentDirectoryCopy.pop();
+		}
+		auto dir = static_cast<DirectoryFile*>(currentDirectoryCopy.top());
+		dir->addChild(new BinaryFile(name));
 	}
 
 	return Msg();

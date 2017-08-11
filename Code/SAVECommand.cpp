@@ -1,16 +1,18 @@
 #include "stdafx.h"
 #include "CommandFactory.h"
 #include "ErrorMessage.h"
+
+#include "BinaryFile.h"
+#include "DirectoryFile.h"
+#include "SymlinkFile.h"
+#include "SymlinkdFile.h"
+
 #include "DiskSystem.h"
 
-#include "GeneralFile.h"
-#include "DirectoryFile.h"
-#include "SymbolGeneralFile.h"
-#include "SymbolDirectoryFile.h"
+#include "tinyxml2.h"
 
 #include <fstream>
-
-#include "tinyxml2.h"
+#include <cassert>
 
 using namespace tinyxml2;
 
@@ -18,19 +20,19 @@ XMLElement* TraverseDirectory(DirectoryFile* file);
 
 static XMLDocument *pDoc = nullptr;
 
-XMLElement* createGF(GeneralFile* file);
+XMLElement* createGF(BinaryFile* file);
 
 XMLElement* createDF(DirectoryFile* file);
 
-XMLElement* createSGF(SymbolGeneralFile* file);
+XMLElement* createSGF(SymlinkFile* file);
 
-XMLElement* createSDF(SymbolDirectoryFile* file);
+XMLElement* createSDF(SymlinkdFile* file);
 
 Msg SAVECommand(queue<Object> objects)
 {
 	if (objects.size() != 1)
 	{
-		return Msg(false, errorSyntaxMessage, nullptr);
+		return Msg(false, errorSyntaxMessage, stack<File*>());
 	}
 
 	auto path = objects.front().m_path.m_pathQueue;
@@ -41,25 +43,16 @@ Msg SAVECommand(queue<Object> objects)
 		path.pop();
 	}
 
-	// pathString = "@\\X:\\vd.xml";
-	// cout << "TEST: path string:" << pathString.substr(2) << endl;
-
 	auto root = DiskSystem::getInstance()->getRootDirectory();
 
 	// NOTE: create xml doc
-	// cout << "TEST: create xml doc" << endl;
 	pDoc = new XMLDocument();
 	auto declaration = pDoc->NewDeclaration("xml version=\"1.0\" encoding=\"UTF-8\"");
 	pDoc->LinkEndChild(declaration);
 
-	// cout << "TEST: traverse directory from root" << endl;
 	pDoc->LinkEndChild(TraverseDirectory(root));
 
-	// cout << "save to:" << pathString.substr(2) << endl;
 	pDoc->SaveFile(pathString.substr(2).c_str());
-
-	// TEST
-	// pDoc->Print();
 
 	delete pDoc;
 	pDoc = nullptr;
@@ -70,10 +63,8 @@ Msg SAVECommand(queue<Object> objects)
 XMLElement* TraverseDirectory(DirectoryFile* file)
 {
 	XMLElement* father = createDF(file);
-	// cout << "TEST: create father:" << file->getName() << endl;
 	if (file->getChildren().size() <= 2)
 	{
-		// cout << "TEST: empty dir" << endl;
 		return father;
 	}
 	else
@@ -86,29 +77,28 @@ XMLElement* TraverseDirectory(DirectoryFile* file)
 			}
 			else
 			{
-				// cout << "TEST: child:" << it->first << endl;
 				// NOTE: create xml element as fater's children
 				XMLElement* child = nullptr;
 				switch (it->second->getType())
 				{
-				case FileType::generalFile:
+				case FileType::binFile:
 				{
-					child = createGF(static_cast<GeneralFile*>(it->second));
+					child = createGF(static_cast<BinaryFile*>(it->second));
 					break;
 				}
-				case FileType::directoryFile:
+				case FileType::dirFile:
 				{
 					child = TraverseDirectory(static_cast<DirectoryFile*>(it->second));
 					break;
 				}
 				case FileType::symlink:
 				{
-					child = createSGF(static_cast<SymbolGeneralFile*>(it->second));
+					child = createSGF(static_cast<SymlinkFile*>(it->second));
 					break;
 				}
 				case FileType::symlinkd:
 				{
-					child = createSDF(static_cast<SymbolDirectoryFile*>(it->second));
+					child = createSDF(static_cast<SymlinkdFile*>(it->second));
 					break;
 				}
 				}
@@ -119,7 +109,7 @@ XMLElement* TraverseDirectory(DirectoryFile* file)
 	}
 }
 
-XMLElement* createGF(GeneralFile* file)
+XMLElement* createGF(BinaryFile* file)
 {
 	// <GeneralFile>
 	// <date>file date</date>
@@ -129,17 +119,16 @@ XMLElement* createGF(GeneralFile* file)
 	// <type>file type</type>
 	// <info>file info</info>
 	// <parent>file parent</parent>
-	// BUG: same directory name like 'subdir' will have some problem
 	XMLElement* fileElement = pDoc->NewElement("File");
-	
+
 	XMLElement* dateElement = pDoc->NewElement("date");
 	dateElement->LinkEndChild(pDoc->NewText(file->getDate().c_str()));
 	fileElement->LinkEndChild(dateElement);
-	
+
 	XMLElement* timeElement = pDoc->NewElement("time");
 	timeElement->LinkEndChild(pDoc->NewText(file->getTime().c_str()));
 	fileElement->LinkEndChild(timeElement);
-	
+
 	XMLElement* sizeElement = pDoc->NewElement("size");
 	sizeElement->LinkEndChild(pDoc->NewText(to_string(file->getSize()).c_str()));
 	fileElement->LinkEndChild(sizeElement);
@@ -147,7 +136,7 @@ XMLElement* createGF(GeneralFile* file)
 	XMLElement* nameElement = pDoc->NewElement("name");
 	nameElement->LinkEndChild(pDoc->NewText(file->getName().c_str()));
 	fileElement->LinkEndChild(nameElement);
-	
+
 	XMLElement* typeElement = pDoc->NewElement("type");
 	typeElement->LinkEndChild(pDoc->NewText(to_string(file->getType()).c_str()));
 	fileElement->LinkEndChild(typeElement);
@@ -162,7 +151,7 @@ XMLElement* createGF(GeneralFile* file)
 	fileElement->LinkEndChild(parentElement);
 
 	XMLElement* dataElement = pDoc->NewElement("data");
-	
+
 	// NOTE: save data to data file
 	ofstream ofs;
 	ofs.open((file->getName() + ".dat").c_str(), ios::binary);
@@ -227,13 +216,13 @@ XMLElement* createDF(DirectoryFile* file)
 
 	XMLElement* parentElement = pDoc->NewElement("parent");
 	auto parent = file->getParent();
-	parentElement->LinkEndChild(pDoc->NewText((parent==nullptr?"nullptr": parent->getName().c_str())));
+	parentElement->LinkEndChild(pDoc->NewText((parent == nullptr ? "nullptr" : parent->getName().c_str())));
 	fileElement->LinkEndChild(parentElement);
 
 	return fileElement;
 }
 
-XMLElement* createSGF(SymbolGeneralFile* file)
+XMLElement* createSGF(SymlinkFile* file)
 {
 	// <SymbolGeneralFile>
 	// <date>file date</date>
@@ -283,9 +272,9 @@ XMLElement* createSGF(SymbolGeneralFile* file)
 	return fileElement;
 }
 
-XMLElement* createSDF(SymbolDirectoryFile* file)
+XMLElement* createSDF(SymlinkdFile* file)
 {
-	// <SymbolDirectoryFile>
+	// <SymlinkdFile>
 	// <date>file date</date>
 	// <time>file time</time>
 	// <size>file size</size>

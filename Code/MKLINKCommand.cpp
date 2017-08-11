@@ -2,10 +2,12 @@
 #include "CommandFactory.h"
 #include "ErrorMessage.h"
 
-#include "GeneralFile.h"
-#include "SymbolGeneralFile.h"
+#include "BinaryFile.h"
+#include "SymlinkFile.h"
 #include "DirectoryFile.h"
-#include "SymbolDirectoryFile.h"
+#include "SymlinkdFile.h"
+
+#include <cassert>
 
 const vector<string> argumentVector = { "/D" };
 
@@ -16,18 +18,18 @@ Msg MKLINKCommand(queue<Object> objects)
 	if (objects.size() != 2)
 	{
 		D_Argument = false;
-		return Msg(false, errorSyntaxMessage, nullptr);
+		return Msg(false, errorSyntaxMessage, stack<File*>());
 	}
 
 	// NOTE: in mklink command, the first object is link
 	// NOTE: in mklink command, the last object is source
 
 	// NOTE: get arguments
-	for (auto argument : objects.front().m_arguments)
+	for (auto args = objects.front().m_arguments; !args.empty(); args.pop())
 	{
-		if (find(argumentVector.begin(), argumentVector.end(), argument) != argumentVector.end())
+		if (find(argumentVector.begin(), argumentVector.end(), args.front()) != argumentVector.end())
 		{
-			if (argument.find("/D") != string::npos)
+			if (args.front().find("/D") != string::npos)
 			{
 				D_Argument = true;
 			}
@@ -35,18 +37,18 @@ Msg MKLINKCommand(queue<Object> objects)
 		else
 		{
 			D_Argument = false;
-			return Msg(false, errorInvalidSwitch + " - " + "\"" + argument.substr(1) + "\"", nullptr);
+			return Msg(false, errorInvalidSwitch + " - " + "\"" + args.front().substr(1) + "\"", stack<File*>());
 		}
 	}
 
 	// NOTE: get source
-	auto source = objects.back().m_file;
-	
+	auto source = objects.back().m_currentDirectory.top();
+
 	// NOTE: ensure source exist
 	if (source == nullptr)
 	{
 		D_Argument = false;
-		return Msg(false, errorFileMessage, nullptr);
+		return Msg(false, errorFileMessage, stack<File*>());
 	}
 
 	string sourcePath;
@@ -56,35 +58,40 @@ Msg MKLINKCommand(queue<Object> objects)
 		sourcePath = sourcePath + "\\" + path.front();
 		path.pop();
 	}
-	// cout << "TEST: source path:" << sourcePath.substr(1);
-
+	
 	// NOTE: get target
-	auto target = objects.front().m_file;
+	auto target = objects.front().m_currentDirectory.top();
 	auto targetName = objects.front().m_path.m_pathQueue.back();
-	auto targetParent = static_cast<DirectoryFile*>(objects.front().m_fileParent);
+	auto currentDirectoryCopy = objects.front().m_currentDirectory;
+	// NOTE: for only C: in currentDirectory
+	if (currentDirectoryCopy.size() != 1)
+	{
+		currentDirectoryCopy.pop();
+	}
+	auto targetParent = currentDirectoryCopy.top();
 
 	// NOTE: ensure target is not exist
 	if (target != nullptr)
 	{
 		D_Argument = false;
-		return Msg(false, errorExistMessage, nullptr);
+		return Msg(false, errorExistMessage, stack<File*>());
 	}
-	else if(targetParent == nullptr)
+	else if (targetParent == nullptr)
 	{
 		D_Argument = false;
-		return Msg(false, errorDirMessage, nullptr);
+		return Msg(false, errorDirMessage, stack<File*>());
 	}
-	
+
 	// NOTE: create link file 
 	if (D_Argument)
 	{
-		auto* file = new SymbolDirectoryFile(targetName, static_cast<DirectoryFile*>(source));
-		targetParent->addChild(file);
+		auto* file = new SymlinkdFile(targetName, static_cast<DirectoryFile*>(source));
+		static_cast<DirectoryFile*>(targetParent)->addChild(file);
 	}
 	else
 	{
-		auto* file = new SymbolGeneralFile(targetName, static_cast<GeneralFile*>(source));
-		targetParent->addChild(file);
+		auto* file = new SymlinkFile(targetName, static_cast<BinaryFile*>(source));
+		static_cast<DirectoryFile*>(targetParent)->addChild(file);
 	}
 
 	D_Argument = false;

@@ -56,7 +56,7 @@ File::File(const string & name)
 
 File::~File()
 {
-	// cout << "TEST: release file:" << m_name << " in " << __FUNCTION__ << endl;
+
 }
 
 string File::getDate() const

@@ -1,19 +1,19 @@
 #pragma once
+
 #include "File.h"
 
-#include <string>
 #include <vector>
 
 using namespace std;
 
-class GeneralFile :
+class BinaryFile :
 	public File
 {
 public:
-	GeneralFile();
-	GeneralFile(const string& name);
-	GeneralFile(vector<string> infos);
-	virtual ~GeneralFile();
+	BinaryFile();
+	BinaryFile(const string& name);
+	BinaryFile(vector<string> infos);
+	virtual ~BinaryFile();
 
 	vector<unsigned char> getBinData() const;
 	void setBinData(const vector<unsigned char>& bin);

@@ -2,13 +2,13 @@
 #include "ObjectGenerator.h"
 
 #include <regex>
+#include <stack>
 
-ObjectGenerator::ObjectGenerator(const string& objectStr, DirectoryFile * currentDirectory)
+ObjectGenerator::ObjectGenerator(const string& objectStr, stack<File*> currentDirectory)
 {
 	// NOTE£ºwildcard process
-	// cout << "TEST: wildcard process:" << objectStr << endl;
-	// cout << "TEST: wildcard directory:" << currentDirectory->getName() << endl;
-
+	// NOTE: currentDirectory top is nullptr, pop it first
+	
 	// NOTE: get regex
 	// NOTE: * and ? cannot in same path
 	regex regex_str;
@@ -25,28 +25,43 @@ ObjectGenerator::ObjectGenerator(const string& objectStr, DirectoryFile * curren
 		wildcard = "?";
 	}
 
+	// NOTE: change to lower and use regex search
+	auto lowerObjectStr = objectStr;
+	transform(lowerObjectStr.begin(), lowerObjectStr.end(), lowerObjectStr.begin(), ::tolower);
+
 	auto pos = objectStr.find(wildcard);
 	// NOTE: start position
 	if (pos == 0)
 	{
-		string str = string("^") + string("\\S") + wildcard + objectStr.substr(pos + 1) + string("$");
+		string str = string("^") + string("\\S") + wildcard + lowerObjectStr.substr(pos + 1) + string("$");
 		regex_str = str;
 	}
 	// NOTE: end position
-	else if (pos == (objectStr.size() - 1))
+	else if (pos == (lowerObjectStr.size() - 1))
 	{
-		string str = string("^") + objectStr.substr(0, pos) + string("\\S") + wildcard + string("$");
+		string str = string("^") + lowerObjectStr.substr(0, pos) + string("\\S") + wildcard + string("$");
 		regex_str = str;
 	}
 	// NOTE: middle position
 	else
 	{
-		string str = string("^") + objectStr.substr(0, pos) + string("[\\S]") + wildcard + objectStr.substr(pos + 1) + string("$");
+		string str = string("^") + lowerObjectStr.substr(0, pos) + string("[\\S]") + wildcard + lowerObjectStr.substr(pos + 1) + string("$");
 		regex_str = str;
 	}
 
+	// NOTE: check if it could be access
+	try
+	{
+		currentDirectory.top()->getName();
+	}
+	catch(std::bad_alloc)
+	{
+		m_objects.clear();
+		return;
+	}
+
 	// NOTE: get files
-	for (auto it = currentDirectory->getChildren().begin(); it != currentDirectory->getChildren().end(); it++)
+	for (auto it = static_cast<DirectoryFile*>(currentDirectory.top())->getChildren().begin(); it != static_cast<DirectoryFile*>(currentDirectory.top())->getChildren().end(); it++)
 	{
 		string name = it->first;
 		// NOTE: step over . and ..
@@ -54,11 +69,14 @@ ObjectGenerator::ObjectGenerator(const string& objectStr, DirectoryFile * curren
 		{
 			continue;
 		}
-		if (regex_search(name, sm_str, regex_str))
+
+		auto lowerName = name;
+		transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
+
+		if (regex_search(lowerName, sm_str, regex_str))
 		{
 			for (auto x = sm_str.begin(); x != sm_str.end(); x++)
 			{
-				// cout << "TEST: get objectStr by wildcard:" << x->str() << endl;
 				m_objects.push_back(x->str());
 			}
 		}

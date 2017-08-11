@@ -2,114 +2,144 @@
 #include "CommandFactory.h"
 #include "ErrorMessage.h"
 
+#include "VDos.h"
+#include "File.h"
+#include "BinaryFile.h"
+#include "DirectoryFile.h"
+#include "SymlinkFile.h"
+#include "SymlinkdFile.h"
+
 #include <exception>
 #include <cassert>
 
-#include "VDos.h"
-#include "SymbolDirectoryFile.h"
+// NOTE: |           for cd command               |
+// NOTE: |----------------------------------------|
+// NOTE: |     objects   |         result         |
+// NOTE: |---------------+------------------------|
+// NOTE: |      empty    |   print current path   |
+// NOTE: |    size > 1   |   errorSyntaxMessage   |
+// NOTE: |   BinaryFile  | errorDirInvalidMessage |
+// NOTE: |  SymlinkFile  | errorDirInvalidMessage |
+// NOTE: | DirectoryFile |         cd dir         |
+// NOTE: | SymlinkdFile  |       cd smlinkd       |
+
 
 Msg CDCommand(queue<Object> objects)
 {
 	if (objects.empty())
 	{
-		// cout << "TEST: objects is empty" << endl;
-		return Msg(true, ".", nullptr);
+		// NOTE: for cd print
+		return Msg(true, ".", stack<File*>());
 	}
-
-	if (objects.size() > 1)
+	else if (objects.size() > 1)
 	{
-		return Msg(false, errorSyntaxMessage, nullptr);
+		return Msg(false, errorSyntaxMessage, stack<File*>());
 	}
-
-	// NOTE: one object
-	auto object = objects.front();
-
-	// NOTE: lost
-	if (object.m_file == nullptr)
+	else
 	{
-		return Msg(false, errorDirMessage, nullptr);
-	}
+		// NOTE: one object
+		auto object = objects.front();
 
-	DirectoryFile* dir = static_cast<DirectoryFile*>(object.m_file);
-
-	// NOTE: symbol directory file
-	if (object.m_file->getType() == FileType::symlinkd)
-	{
-		// cout << "TEST: cd symbol directory file" << endl;
-		// NOTE: get root link
-		DirectoryFile* link = static_cast<SymbolDirectoryFile*>(dir)->getLinkDirectory();
-
-		if (link != nullptr)
+		// NOTE: lost
+		if (object.m_currentDirectory.top() == nullptr)
 		{
-			// cout << "TEST: link not nullptr" << endl;
-			try
+			// NOTE: for 'cd /'
+			if (object.m_path.m_pathQueue.empty())
 			{
-				while (link->getType() == FileType::symlinkd)
+				// NOTE: clear VDos::_path
+				while (VDos::_path.size() != 1)
 				{
-					link = static_cast<SymbolDirectoryFile*>(link)->getLinkDirectory();
-					// cout << "TEST: after get link, link name:" << link->getName() << endl;
-					// cout << "TEST: after get link, link type:" << link->getTypeString() << endl;
+					VDos::_path.pop();
 				}
-				// cout << "TEST: link end name:" << link->getName() << endl;
-				// cout << "TEST: link end type:" << link->getTypeString() << endl;
-
-				// NOTE: need a code that throws std::bad_alloc exception, WTF!
-				link->getName();
-
-				dir = link;
-			}
-			catch (std::bad_alloc)
-			{
-				// TEST: print VDos::_path
-				auto vPath = VDos::_path;
-				while (!vPath.empty())
-				{
-					// cout << "TEST: vPath:" << vPath.top() << endl;
-					vPath.pop();
-				}
-				return Msg(false, errorDirMessage, nullptr);
-			}
-		}
-		else
-		{
-			// cout << "TEST: link nullptr" << endl;
-			return Msg(false, errorDirMessage, nullptr);
-		}
-	}
-
-	// NOTE: calculate path to print
-	// cout << "TEST: output cd path:" << endl;
-	auto pathQueue = object.m_path.m_pathQueue;
-	while (!pathQueue.empty())
-	{
-		// cout << pathQueue.front() << "\\";
-		// NOTE: dont do anything
-		if (pathQueue.front().compare(".") == 0)
-		{
-			// cout << "TEST: do nothing" << endl;
-		}
-		// NOTE: pop last one(use stack)
-		else if (pathQueue.front().compare("..") == 0)
-		{
-			if (VDos::_path.size() == 1)
-			{
-				break;
+				// NOTE: return partition directory
+				stack<File*> currentDirectory;
+				currentDirectory.push(DiskSystem::getInstance()->getRootDirectory()->search(initPartition, FileType::dirFile)->second);
+				return Msg(true, "", currentDirectory);
 			}
 			else
 			{
-				VDos::_path.pop();
+				return Msg(false, errorDirMessage, object.m_currentDirectory);
 			}
 		}
-		// NOTE: push one(use stack)
+
+		// NOTE: object is DirectoryFile
+		if (object.m_currentDirectory.top()->getType() == FileType::dirFile)
+		{
+
+		}
+		// NOTE: object is SymlinkdFile
+		else if (object.m_currentDirectory.top()->getType() == FileType::symlinkd)
+		{
+			// NOTE: to trigger try throw catch
+			try
+			{
+				// NOTE: throw std:;bad_alloc exception, means its linker is invalid
+				auto topDir = static_cast<SymlinkdFile*>(object.m_currentDirectory.top());
+				auto link = topDir->getLinkDirectory();
+				if (link == nullptr)
+				{
+					throw link;
+				}
+				else
+				{
+					link->getName();
+				}
+			}
+			catch (std::bad_alloc)
+			{
+				return Msg(false, errorDirMessage, stack<File*>());
+			}
+			catch (DirectoryFile*)
+			{
+				return Msg(false, errorDirMessage, stack<File*>());
+			}
+			// NOTE: for secure, no crash!
+			catch (...)
+			{
+				return Msg(false, errorDirMessage, stack<File*>());
+			}
+		}
+		// NOTE: object is BinaryFile or SymlinkFile
 		else
 		{
-			// cout << "TEST: _path size:" << VDos::_path.size() << endl;
-			VDos::_path.push(pathQueue.front());
+			object.m_currentDirectory.top() = nullptr;
+			return Msg(false, errorDirInvalidMessage, object.m_currentDirectory);
 		}
-		pathQueue.pop();
-	}
-	// cout << endl;
 
-	// NOTE: change current
-	return Msg(true, "", dir);
+		// NOTE: calculate path to print
+		auto pathQueue = object.m_path.m_pathQueue;
+		while (!pathQueue.empty())
+		{
+			// NOTE: dont do anything
+			if (pathQueue.front().compare(".") == 0)
+			{
+			
+			}
+			// NOTE: pop last one(use stack)
+			else if (pathQueue.front().compare("..") == 0)
+			{
+				if (VDos::_path.size() == 1)
+				{
+					break;
+				}
+				else
+				{
+					VDos::_path.pop();
+				}
+			}
+			// NOTE: push one(use stack)
+			else
+			{
+				// NOTE: for cd command
+				if (pathQueue.front().compare(initPartition) != 0)
+				{
+					VDos::_path.push(pathQueue.front());
+				}
+			}
+			pathQueue.pop();
+		}
+
+		// NOTE: change current
+		return Msg(true, "", object.m_currentDirectory);
+	}
 }

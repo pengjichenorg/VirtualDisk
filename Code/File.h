@@ -1,12 +1,10 @@
 #pragma once
 
-#include <string>
-
 using namespace std;
 
 enum FileType {
-	directoryFile = 0,
-	generalFile,
+	dirFile = 0,
+	binFile,
 	symlink,
 	symlinkd
 };
@@ -28,7 +26,7 @@ public:
 	File* getParent() const;
 
 	void setName(string name);
-	virtual void setParent(File* file);
+	void setParent(File* file);
 
 protected:
 	string m_date;

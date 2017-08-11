@@ -1,12 +1,8 @@
 #pragma once
 
-#include <array>
-#include <string>
-
-#include "File.h"
 #include "DirectoryFile.h"
-#include "GeneralFile.h"
-#include "SymbolDirectoryFile.h"
+
+#include <array>
 
 const array<string, 10> partitionName = {
 	"C:", "D:", "E:", "F:", "G", "H", "I", "J", "K", "L"

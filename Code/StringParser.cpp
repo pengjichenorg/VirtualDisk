@@ -6,8 +6,6 @@
 #include "StringParserCmd2.h"
 #include "StringParserCmdN.h"
 
-#include "ErrorMessage.h"
-
 #include <regex>
 #include <algorithm>
 
@@ -16,7 +14,6 @@ using namespace std;
 StringParser::StringParser()
 {
 }
-
 
 StringParser::~StringParser()
 {
@@ -27,7 +24,7 @@ StringParser::~StringParser()
 	m_stringParserCmd = nullptr;
 }
 
-void StringParser::parse(const string & inputString, DirectoryFile* currentDirectory)
+void StringParser::parse(const string & inputString, stack<File*> currentDirectory)
 {
 	string s = inputString;
 	regex regex_str("\\S+");
@@ -44,38 +41,33 @@ void StringParser::parse(const string & inputString, DirectoryFile* currentDirec
 		}
 		s = sm_str.suffix().str();
 	}
-	
+
 	// NOTE: empty input
 	if (strings.empty())
 	{
 		// NOTE: input blank character, do nothing
 		return;
 	}
-	
+
 	// NOTE: get command
 	m_command = strings.front();
 	// NOTE: change Upper to Lower
 	transform(m_command.begin(), m_command.end(), m_command.begin(), ::tolower);
-	// cout << "TEST: after transform command upper to lower:" << m_command << endl;
 	strings.pop();
-	
+
 	// NOTE: for createMode
 	Object::createMode = false;
 	if (m_command.compare("md") == 0)
 	{
-		// cout << "TEST: open create mode" << endl;
 		Object::createMode = true;
 	}
 
-	// NOTE: TEST
-	// cout << "TEST: parse command:" << m_command << endl;
-	// cout << "TEST: string queue:";
-	// cout << "|";
-	// for (auto queueStr = strings; !queueStr.empty(); queueStr.pop())
-	// {
-	//	 cout << queueStr.front() << " ";
-	// }
-	// cout << "|" << endl;
+	// NOTE: for rdMode
+	Object::rdMode = false;
+	if (m_command.compare("rd") == 0)
+	{
+		Object::rdMode = true;
+	}
 
 	// NOTE: get StringParserCmd
 	if (find(cmd0.begin(), cmd0.end(), m_command) != cmd0.end())
@@ -96,7 +88,6 @@ void StringParser::parse(const string & inputString, DirectoryFile* currentDirec
 	}
 	else
 	{
-		// cout << "in get StringParserCmd else" << endl;
 		m_command = "error";
 		// NOTE: error command
 		m_stringParserCmd = new StringParserCmd0(strings, currentDirectory);
@@ -109,14 +100,14 @@ string StringParser::getCommand() const
 	return m_command;
 }
 
-queue<Object> StringParser::getObjects() const 
+queue<Object> StringParser::getObjects() const
 {
 	auto objects = m_stringParserCmd->getObjects();
 
 	// NOTE: for 'dir', cause dir default execute 'dir .'
 	if (m_command.compare("dir") == 0 && objects.empty())
 	{
-		vector<string> arguments;
+		queue<string> arguments;
 		objects.emplace(string("."), arguments, m_currentDirectory);
 	}
 

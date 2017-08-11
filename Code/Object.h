@@ -1,21 +1,25 @@
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "Path.h"
 #include "DirectoryFile.h"
+
+#include <queue>
+#include <stack>
 
 class Object
 {
 public:
-	Object(const Path& path, vector<string> arguments, DirectoryFile* directory);
-	
+	Object(const Path& path, queue<string> arguments, stack<File*> currentDirectory);
+
 	Path m_path;
-	vector<string> m_arguments;
-	File* m_file = nullptr;
-	File* m_fileParent = nullptr;
-	
+	queue<string> m_arguments;
+	stack<File*> m_currentDirectory;
+
+	// NOTE: for md command
 	static bool createMode;
+
+	// NOTE: for rd command
+	static bool rdMode;
+
 };
 

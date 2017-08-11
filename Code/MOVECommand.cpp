@@ -2,18 +2,19 @@
 #include "CommandFactory.h"
 #include "ErrorMessage.h"
 
-#include "GeneralFile.h"
+#include "BinaryFile.h"
 #include "DirectoryFile.h"
-#include "SymbolGeneralFile.h"
-#include "SymbolDirectoryFile.h"
+#include "SymlinkFile.h"
+#include "SymlinkdFile.h"
 
 #include <exception>
+#include <cassert>
 
 // NOTE: for move command, there are some conditions as follow:
 // NOTE: | source type | target type |         result         |
-// NOTE: |    GF/SGF   |    GF/SGF   | move file file         |
-// NOTE: |    GF/SGF   |    DF/SDF   | move file folder       |
-// NOTE: |    DF/SDF   |    GF/SGF   | errorSyntaxMessage     |
+// NOTE: |    BF/SBF   |    BF/SBF   | move file file         |
+// NOTE: |    BF/SBF   |    DF/SDF   | move file folder       |
+// NOTE: |    DF/SDF   |    BF/SBF   | errorSyntaxMessage     |
 // NOTE: |    DF/SDF   |    DF/SDF   | move folder\* folder\* |
 
 const vector<string> argumentVector = { "/y" };
@@ -25,15 +26,15 @@ Msg MOVECommand(queue<Object> objects)
 	if (objects.size() < 2)
 	{
 		y_Argument = false;
-		return Msg(false, errorSyntaxMessage, nullptr);
+		return Msg(false, errorSyntaxMessage, stack<File*>());
 	}
 
 	// NOTE: get arguments
-	for (auto argument : objects.front().m_arguments)
+	for (auto args = objects.front().m_arguments; !args.empty(); args.pop())
 	{
-		if (find(argumentVector.begin(), argumentVector.end(), argument) != argumentVector.end())
+		if (find(argumentVector.begin(), argumentVector.end(), args.front()) != argumentVector.end())
 		{
-			if (argument.find("/y") != string::npos)
+			if (args.front().find("/y") != string::npos)
 			{
 				y_Argument = true;
 			}
@@ -41,28 +42,32 @@ Msg MOVECommand(queue<Object> objects)
 		else
 		{
 			y_Argument = false;
-			return Msg(false, errorInvalidSwitch + " - " + "\"" + argument.substr(1) + "\"", nullptr);
+			return Msg(false, errorInvalidSwitch + " - " + "\"" + args.front().substr(1) + "\"", stack<File*>());
 		}
 	}
 
 	// NOTE: get target
-	auto target = objects.back().m_file;
-	auto targetParent = objects.back().m_fileParent;
+	auto target = objects.back().m_currentDirectory.top();
+	auto currentDirectoryCopy = objects.back().m_currentDirectory;
+	// NOTE: for only C: in currentDirectory
+	if (currentDirectoryCopy.size() != 1)
+	{
+		currentDirectoryCopy.pop();
+	}
+	auto targetParent = currentDirectoryCopy.top();
 	auto targetName = objects.back().m_path.m_pathQueue.back();
 
 	// NOTE: ensure target directory exist or target file's directory exist
 	if (target == nullptr && targetParent == nullptr)
 	{
 		y_Argument = false;
-		return Msg(false, errorDirMessage, nullptr);
+		return Msg(false, errorDirMessage, stack<File*>());
 	}
 
 	if (target != nullptr)
 	{
-		// cout << "TEST: target name:" << targetName << endl;
-		// cout << "TEST: target file name:" << target->getName() << endl;
 		// NOTE: target is general file or symbol general file
-		if (target->getType() == FileType::generalFile || target->getType() == FileType::symlink)
+		if (target->getType() == FileType::binFile || target->getType() == FileType::symlink)
 		{
 			if (y_Argument)
 			{
@@ -70,53 +75,49 @@ Msg MOVECommand(queue<Object> objects)
 				if (objects.size() != 2)
 				{
 					y_Argument = false;
-					return Msg(false, errorSyntaxMessage, nullptr);
+					return Msg(false, errorSyntaxMessage, stack<File*>());
 				}
 				else
 				{
-					auto sourceFile = objects.front().m_file;
+					auto sourceFile = objects.front().m_currentDirectory.top();
 					if (sourceFile == nullptr)
 					{
 						y_Argument = false;
-						return Msg(false, errorFileMessage, nullptr);
+						return Msg(false, errorFileMessage, stack<File*>());
 					}
 					else
 					{
-						if (sourceFile->getType() == FileType::directoryFile || sourceFile->getType() == FileType::symlinkd)
+						if (sourceFile->getType() == FileType::dirFile || sourceFile->getType() == FileType::symlinkd)
 						{
 							y_Argument = false;
-							return Msg(false, errorSyntaxMessage, nullptr);
+							return Msg(false, errorSyntaxMessage, stack<File*>());
 						}
 						// NOTE: source file is general file
-						else if (sourceFile->getType() == FileType::generalFile)
+						else if (sourceFile->getType() == FileType::binFile)
 						{
-							auto sf = static_cast<GeneralFile*>(sourceFile);
+							auto sf = static_cast<BinaryFile*>(sourceFile);
 							auto sfParent = sourceFile->getParent();
-							GeneralFile* file = new GeneralFile(*sf);
+							BinaryFile* file = new BinaryFile(*sf);
 							file->setName(targetName);
-
-							// cout << "TEST: source file:" << file->getName() << endl;
 
 							// NOTE: copy
 							static_cast<DirectoryFile*>(targetParent)->addChild(file);
 							// NOTE: delete
-							static_cast<DirectoryFile*>(sfParent)->removeChild(sourceFile->getName());
+							static_cast<DirectoryFile*>(sfParent)->removeChild(sourceFile->getName(), sourceFile->getType());
 						}
 						// NOTE: source file is symbol file
 						else
 						{
-							auto sf = static_cast<SymbolGeneralFile*>(sourceFile);
+							auto sf = static_cast<SymlinkFile*>(sourceFile);
 							auto sfParent = sourceFile->getParent();
-							SymbolGeneralFile* file = new SymbolGeneralFile(*sf);
+							SymlinkFile* file = new SymlinkFile(*sf);
 							file->setName(targetName);
-							sf->setLinkFile(static_cast<SymbolGeneralFile*>(sourceFile)->getLinkFile());
-
-							// cout << "TEST: source file:" << file->getName() << endl;
+							sf->setLinkFile(static_cast<SymlinkFile*>(sourceFile)->getLinkFile());
 
 							// NOTE: copy
 							static_cast<DirectoryFile*>(targetParent)->addChild(file);
 							// NOTE: delete
-							static_cast<DirectoryFile*>(sfParent)->removeChild(sourceFile->getName());
+							static_cast<DirectoryFile*>(sfParent)->removeChild(sourceFile->getName(), sourceFile->getType());
 						}
 					}
 				}
@@ -126,27 +127,28 @@ Msg MOVECommand(queue<Object> objects)
 			else
 			{
 				y_Argument = false;
-				return Msg(false, errorExistMessage, nullptr);
+				return Msg(false, errorExistMessage, stack<File*>());
 			}
 		}
 		// NOTE: target is directory or symbol directory file
 		else
 		{
 			// NOTE: get taraget directory
-			File* directory;
-			if (target->getType() == FileType::directoryFile)
+			File* directory = nullptr;
+			if (target->getType() == FileType::dirFile)
 			{
 				directory = target;
 			}
-			else
+			else if (target->getType() == FileType::symlinkd)
 			{
-				// NOTE: get root link
-				DirectoryFile* link = static_cast<SymbolDirectoryFile*>(target)->getLinkDirectory();
 				try
 				{
+					// NOTE: get root link
+					DirectoryFile* link = static_cast<SymlinkdFile*>(target)->getLinkDirectory();
+
 					while (link->getType() == FileType::symlinkd)
 					{
-						link = static_cast<SymbolDirectoryFile*>(link)->getLinkDirectory();
+						link = static_cast<SymlinkdFile*>(link)->getLinkDirectory();
 					}
 					// NOTE: need a code that throws std::bad_alloc exception, WTF!
 					link->getName();
@@ -156,19 +158,21 @@ Msg MOVECommand(queue<Object> objects)
 				catch (std::bad_alloc)
 				{
 					y_Argument = false;
-					return Msg(false, errorDirMessage, nullptr);
+					return Msg(false, errorDirMessage, stack<File*>());
+				}
+				catch (...)
+				{
+					y_Argument = false;
+					return Msg(false, errorDirMessage, stack<File*>());
 				}
 			}
 
 			// NOTE: get source files, only copy non-directory file
 			vector<File*> sources;
 
-			//  if(objects.front())
-
 			while (objects.size() > 1)
 			{
-				sources.push_back(objects.front().m_file);
-				// cout << "TEST: move file name:" << objects.front().m_file->getName() << endl;
+				sources.push_back(objects.front().m_currentDirectory.top());
 				objects.pop();
 			}
 
@@ -177,108 +181,47 @@ Msg MOVECommand(queue<Object> objects)
 			{
 				for (auto source : sources)
 				{
-					if (static_cast<DirectoryFile*>(target)->search(source->getName()) != static_cast<DirectoryFile*>(target)->getChildren().end())
+					if (static_cast<DirectoryFile*>(target)->search(source->getName(), source->getType()) != static_cast<DirectoryFile*>(target)->getChildren().end())
 					{
 						y_Argument = false;
-						return Msg(false, errorExistMessage, nullptr);
+						return Msg(false, errorExistMessage, stack<File*>());
 					}
 				}
 			}
 
-			//while (!objects.empty())
-			//{
-			//	auto object = objects.front();
-			//	if (object.m_file == nullptr)
-			//	{
-			//		// cout << "TEST: error file message" << endl;
-			//		return Msg(false, errorFileMessage, nullptr);
-			//	}
-			//	else
-			//	{
-			//		// cout << "TEST: object file name:" << object.m_file->getName() << endl;
-			//		if (object.m_file->getType() == FileType::directoryFile || object.m_file->getType() == FileType::symlinkd)
-			//		{
-			//			// NOTE: get dir
-			//			File* dir;
-			//			if (object.m_file->getType() == FileType::directoryFile)
-			//			{
-			//				dir = object.m_file;
-			//			}
-			//			else
-			//			{
-			//				// NOTE: get root link
-			//				DirectoryFile* link = static_cast<SymbolDirectoryFile*>(object.m_file)->getLinkDirectory();
-			//				while (object.m_file->getType() == FileType::symlinkd)
-			//				{
-			//					object.m_file = static_cast<SymbolDirectoryFile*>(link)->getLinkDirectory();
-			//				}
-			//				dir = link;
-			//			}
-
-			//			// NOTE: add source
-			//			for (auto it = static_cast<DirectoryFile*>(dir)->getChildren().begin();
-			//			it != static_cast<DirectoryFile*>(dir)->getChildren().end(); it++)
-			//			{
-			//				if (it->second->getType() == FileType::directoryFile || it->second->getType() == FileType::symlinkd)
-			//				{
-			//					continue;
-			//				}
-			//				else
-			//				{
-			//					sources.push_back(it->second);
-			//				}
-			//			}
-
-			//			objects.pop();
-			//			continue;
-			//		}
-			//	}
-			//	// cout << "TEST: push source file:" << object.m_file->getName() << endl;
-			//	sources.push_back(object.m_file);
-			//	objects.pop();
-			//}
-
 			// NOTE: move, dont need to change name
 			for (auto source : sources)
 			{
-				// cout << "TEST: source:" << source->getName() << endl;
-				// NOTE: source file is general file
-				if (source->getType() == FileType::generalFile)
+				// NOTE: source file is binary file
+				if (source->getType() == FileType::binFile)
 				{
-					auto sf = static_cast<GeneralFile*>(source);
+					auto sf = static_cast<BinaryFile*>(source);
 					auto sfParent = source->getParent();
-					GeneralFile* file = new GeneralFile(*sf);
-
-					// cout << "TEST: source file:" << file->getName() << endl;
+					BinaryFile* file = new BinaryFile(*sf);
 
 					// NOTE: copy
 					static_cast<DirectoryFile*>(directory)->addChild(file);
 					// NOTE: delete
-					static_cast<DirectoryFile*>(sfParent)->removeChild(source->getName());
+					static_cast<DirectoryFile*>(sfParent)->removeChild(source->getName(), source->getType());
 				}
-				// NOTE: source file is symbol general file
-				else
+				// NOTE: source file is symbol binary file
+				else if (source->getType() == FileType::symlink)
 				{
-					auto sf = static_cast<SymbolGeneralFile*>(source);
+					auto sf = static_cast<SymlinkFile*>(source);
 					auto sfParent = source->getParent();
-					SymbolGeneralFile* file = new SymbolGeneralFile(*sf);
-					sf->setLinkFile(static_cast<SymbolGeneralFile*>(source)->getLinkFile());
-
-					// cout << "TEST: source file:" << file->getName() << endl;
+					SymlinkFile* file = new SymlinkFile(*sf);
+					sf->setLinkFile(static_cast<SymlinkFile*>(source)->getLinkFile());
 
 					// NOTE: copy
 					static_cast<DirectoryFile*>(directory)->addChild(file);
 					// NOTE: delete
-					static_cast<DirectoryFile*>(sfParent)->removeChild(source->getName());
+					static_cast<DirectoryFile*>(sfParent)->removeChild(source->getName(), source->getType());
 				}
 			}
 			y_Argument = false;
 			return Msg();
 		}
 	}
-
-	// cout << "TEST: target directory:" << (target == nullptr ? "nullptr" : target->getName()) << endl;
-	// cout << "TEST: target parent:" << (targetParent == nullptr ? "nullptr" : targetParent->getName()) << endl;
 
 	// NOTE: target is file, not directory
 	if (target == nullptr)
@@ -287,65 +230,61 @@ Msg MOVECommand(queue<Object> objects)
 		if (objects.size() != 2)
 		{
 			y_Argument = false;
-			return Msg(false, errorSyntaxMessage, nullptr);
+			return Msg(false, errorSyntaxMessage, stack<File*>());
 		}
-		auto sourceFile = objects.front().m_file;
+		auto sourceFile = objects.front().m_currentDirectory.top();
 		if (sourceFile == nullptr)
 		{
 			y_Argument = false;
-			return Msg(false, errorFileMessage, nullptr);
+			return Msg(false, errorFileMessage, stack<File*>());
 		}
 		else
 		{
-			if (sourceFile->getType() == FileType::directoryFile || sourceFile->getType() == FileType::symlinkd)
+			if (sourceFile->getType() == FileType::dirFile || sourceFile->getType() == FileType::symlinkd)
 			{
 				y_Argument = false;
-				return Msg(false, errorSyntaxMessage, nullptr);
+				return Msg(false, errorSyntaxMessage, stack<File*>());
 			}
 			// NOTE: source file is general file
-			else if (sourceFile->getType() == FileType::generalFile)
+			else if (sourceFile->getType() == FileType::binFile)
 			{
 				// NOTE: same name check
-				if (static_cast<DirectoryFile*>(targetParent)->search(sourceFile->getName()) != static_cast<DirectoryFile*>(targetParent)->getChildren().end())
+				if (static_cast<DirectoryFile*>(targetParent)->search(sourceFile->getName(), sourceFile->getType()) != static_cast<DirectoryFile*>(targetParent)->getChildren().end())
 				{
 					y_Argument = false;
-					return Msg(false, errorExistMessage, nullptr);
+					return Msg(false, errorExistMessage, stack<File*>());
 				}
 
-				auto sf = static_cast<GeneralFile*>(sourceFile);
+				auto sf = static_cast<BinaryFile*>(sourceFile);
 				auto sfParent = sourceFile->getParent();
-				GeneralFile* file = new GeneralFile(*sf);
+				BinaryFile* file = new BinaryFile(*sf);
 				file->setName(targetName);
-
-				// cout << "TEST: source file:" << file->getName() << endl;
 
 				// NOTE: copy
 				static_cast<DirectoryFile*>(targetParent)->addChild(file);
 				// NOTE: delete
-				static_cast<DirectoryFile*>(sfParent)->removeChild(sourceFile->getName());
+				static_cast<DirectoryFile*>(sfParent)->removeChild(sourceFile->getName(), sourceFile->getType());
 			}
 			// NOTE: source file is symbol file
 			else
 			{
 				// NOTE: same name check
-				if (static_cast<DirectoryFile*>(targetParent)->search(sourceFile->getName()) != static_cast<DirectoryFile*>(targetParent)->getChildren().end())
+				if (static_cast<DirectoryFile*>(targetParent)->search(sourceFile->getName(), sourceFile->getType()) != static_cast<DirectoryFile*>(targetParent)->getChildren().end())
 				{
 					y_Argument = false;
-					return Msg(false, errorExistMessage, nullptr);
+					return Msg(false, errorExistMessage, stack<File*>());
 				}
 
-				auto sf = static_cast<SymbolGeneralFile*>(sourceFile);
+				auto sf = static_cast<SymlinkFile*>(sourceFile);
 				auto sfParent = sourceFile->getParent();
-				SymbolGeneralFile* file = new SymbolGeneralFile(*sf);
+				SymlinkFile* file = new SymlinkFile(*sf);
 				file->setName(targetName);
-				sf->setLinkFile(static_cast<SymbolGeneralFile*>(sourceFile)->getLinkFile());
-
-				// cout << "TEST: source file:" << file->getName() << endl;
+				sf->setLinkFile(static_cast<SymlinkFile*>(sourceFile)->getLinkFile());
 
 				// NOTE: copy
 				static_cast<DirectoryFile*>(targetParent)->addChild(file);
 				// NOTE: delete
-				static_cast<DirectoryFile*>(sfParent)->removeChild(sourceFile->getName());
+				static_cast<DirectoryFile*>(sfParent)->removeChild(sourceFile->getName(), sourceFile->getType());
 			}
 		}
 	}

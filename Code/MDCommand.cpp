@@ -2,22 +2,30 @@
 #include "CommandFactory.h"
 #include "ErrorMessage.h"
 
+#include <cassert>
+
 Msg MDCommand(queue<Object> objects)
 {
 	if (objects.empty())
 	{
-		// cout << "TEST: objects is empty" << endl;
-		return Msg(false, errorSyntaxMessage, nullptr);
+		return Msg(false, errorSyntaxMessage, stack<File*>());
 	}
 
 	while (!objects.empty())
 	{
-		// NOTE: if object.m_file is nullptr, output errorExistMessage
-		if (objects.front().m_file == nullptr)
+		if (!objects.front().m_currentDirectory.empty())
 		{
-			return Msg(false, errorExistMessage, nullptr);
+			// NOTE: if top is nullptr, output errorExistMessage
+			if (objects.front().m_currentDirectory.top() == nullptr)
+			{
+				return Msg(false, errorExistMessage, objects.front().m_currentDirectory);
+			}
 		}
-
+		else
+		{
+			// NOTE: is object currentDirectory is empty, output error invalid name message
+			return Msg(false, errorNameMessage, stack<File*>());
+		}
 		objects.pop();
 	}
 

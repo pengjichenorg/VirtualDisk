@@ -4,5 +4,5 @@
 
 Msg ERRORCommand(queue<Object> objects)
 {
-	return Msg(false, errorCmdMessage, nullptr);
+	return Msg(false, errorCmdMessage, stack<File*>());
 }

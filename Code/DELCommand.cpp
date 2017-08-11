@@ -3,11 +3,19 @@
 #include "ErrorMessage.h"
 #include "DiskSystem.h"
 
+#include "File.h"
+#include "BinaryFile.h"
+#include "DirectoryFile.h"
+#include "SymlinkFile.h"
+#include "SymlinkdFile.h"
+
 #include <algorithm>
 #include <exception>
+#include <cassert>
 
 // NOTE: for del command when target is link, there are some conditions as follow:
 // NOTE: | link file | link target |         result         |
+// NOTE: |-----------+-------------+------------------------|
 // NOTE: |    SGF    |    exist    |        del SGF         |
 // NOTE: |    SGF    |  non-exist  |        del SGF         |
 // NOTE: |    SDF    |    exist    |        del link\*      |
@@ -21,17 +29,16 @@ Msg DELCommand(queue<Object> objects)
 {
 	if (objects.empty())
 	{
-		// cout << "TEST: objects is empty" << endl;
 		s_Argument = false;
-		return Msg(false, errorSyntaxMessage, nullptr);
+		return Msg(false, errorSyntaxMessage, stack<File*>());
 	}
 
 	// NOTE: get arguments
-	for (auto argument : objects.front().m_arguments)
+	for (auto args = objects.front().m_arguments; !args.empty(); args.pop())
 	{
-		if (find(argumentVector.begin(), argumentVector.end(), argument) != argumentVector.end())
+		if (find(argumentVector.begin(), argumentVector.end(), args.front()) != argumentVector.end())
 		{
-			if (argument.find("/s") != string::npos)
+			if (args.front().find("/s") != string::npos)
 			{
 				s_Argument = true;
 			}
@@ -39,7 +46,7 @@ Msg DELCommand(queue<Object> objects)
 		else
 		{
 			s_Argument = false;
-			return Msg(false, errorInvalidSwitch + " - " + "\"" + argument.substr(1) + "\"", nullptr);
+			return Msg(false, errorInvalidSwitch + " - " + "\"" + args.front().substr(1) + "\"", stack<File*>());
 		}
 	}
 
@@ -47,10 +54,10 @@ Msg DELCommand(queue<Object> objects)
 	auto _objects = objects;
 	while (!_objects.empty())
 	{
-		if (_objects.front().m_file == nullptr)
+		if (_objects.front().m_currentDirectory.top() == nullptr)
 		{
 			s_Argument = false;
-			return Msg(false, errorNonFileMessage, nullptr);
+			return Msg(false, errorNonFileMessage, _objects.front().m_currentDirectory);
 		}
 		_objects.pop();
 	}
@@ -58,17 +65,22 @@ Msg DELCommand(queue<Object> objects)
 	// NOTE: delete
 	while (!objects.empty())
 	{
-		auto objectFile = objects.front().m_file;
+		auto objectFile = objects.front().m_currentDirectory.top();
 		auto objectFileName = objectFile->getName();
-		auto objectParent = static_cast<DirectoryFile*>(objects.front().m_fileParent);
+		auto currentDirectoryCopy = objects.front().m_currentDirectory;
+		// NOTE: for only C: in currentDirectory
+		if (currentDirectoryCopy.size() != 1)
+		{
+			currentDirectoryCopy.pop();
+		}
+		auto objectParent = static_cast<DirectoryFile*>(currentDirectoryCopy.top());
 
 		// NOTE: ensure could be found
-		if (objectParent->search(objectFileName) != objectParent->getChildren().end())
+		if (objectParent->search(objectFileName, objectFile->getType()) != objectParent->getChildren().end())
 		{
 			// NOTE: delete directory
-			if (objectFile->getType() == FileType::directoryFile)
+			if (objectFile->getType() == FileType::dirFile)
 			{
-				// cout << "TEST: del driectory will do del dir\\*" << endl;
 				string path;
 				auto dir = objectFile;
 				while (dir != DiskSystem::getInstance()->getRootDirectory())
@@ -114,7 +126,7 @@ Msg DELCommand(queue<Object> objects)
 									{
 										continue;
 									}
-									else if (it->second->getType() == FileType::directoryFile)
+									else if (it->second->getType() == FileType::dirFile)
 									{
 										dirQueue.push(static_cast<DirectoryFile*>(it->second));
 									}
@@ -122,7 +134,10 @@ Msg DELCommand(queue<Object> objects)
 								}
 								for (auto file : files)
 								{
-									_dir->removeChild(file);
+									// NOTE: delete general file
+									_dir->removeChild(file, FileType::binFile);
+									// NOTE: delete symbol general file
+									_dir->removeChild(file, FileType::symlink);
 								}
 								files.clear();
 								dirQueue.pop();
@@ -132,9 +147,9 @@ Msg DELCommand(queue<Object> objects)
 						else
 						{
 							for (auto it = static_cast<DirectoryFile*>(objectFile)->getChildren().begin();
-								it != static_cast<DirectoryFile*>(objectFile)->getChildren().end(); it++)
+							it != static_cast<DirectoryFile*>(objectFile)->getChildren().end(); it++)
 							{
-								if (it->first.compare(".") == 0 || it->first.compare("..") == 0 || it->second->getType() == FileType::directoryFile || it->second->getType() == FileType::symlinkd)
+								if (it->first.compare(".") == 0 || it->first.compare("..") == 0 || it->second->getType() == FileType::binFile || it->second->getType() == FileType::symlinkd)
 								{
 									continue;
 								}
@@ -142,12 +157,15 @@ Msg DELCommand(queue<Object> objects)
 							}
 							for (auto file : files)
 							{
-								static_cast<DirectoryFile*>(objectFile)->removeChild(file);
+								// NOTE: delete binary file
+								static_cast<DirectoryFile*>(objectFile)->removeChild(file, FileType::binFile);
+								// NOTE: delete symbol general file
+								static_cast<DirectoryFile*>(objectFile)->removeChild(file, FileType::symlink);
 							}
 						}
 						result = false;
 					}
-					else if(s.compare("n") == 0 || s.compare("no") == 0)
+					else if (s.compare("n") == 0 || s.compare("no") == 0)
 					{
 						result = false;
 					}
@@ -160,27 +178,28 @@ Msg DELCommand(queue<Object> objects)
 			// NOTE: delete symlinkd
 			else if (objectFile->getType() == FileType::symlinkd)
 			{
-				// cout << "TEST: del symlinkd will do del dir\\*" << endl;
-
-				// NOTE: get root link
-				DirectoryFile* link = static_cast<SymbolDirectoryFile*>(objectFile)->getLinkDirectory();
+				DirectoryFile* link = nullptr;
 				try
 				{
-					// cout << "TEST: link directory file:" << link->getName() << endl;
+					// NOTE: get root link
+					link = static_cast<SymlinkdFile*>(objectFile)->getLinkDirectory();
 					while (link->getType() == FileType::symlinkd)
 					{
-						// cout << "TEST: before get link:" << link->getName() << endl;
-						link = static_cast<SymbolDirectoryFile*>(link)->getLinkDirectory();
-						// cout << "TEST: after get link:" << link->getName() << endl;
+						link = static_cast<SymlinkdFile*>(link)->getLinkDirectory();
 					}
-					
+
 					// NOTE: need a code that throws std::bad_alloc exception, WTF!
 					link->getName();
 				}
 				catch (std::bad_alloc)
 				{
 					s_Argument = false;
-					return Msg(false, errorDirMessage, nullptr);
+					return Msg(false, errorDirMessage, stack<File*>());
+				}
+				catch (...)
+				{
+					s_Argument = false;
+					return Msg(false, errorDirMessage, stack<File*>());
 				}
 
 				string path;
@@ -216,7 +235,7 @@ Msg DELCommand(queue<Object> objects)
 						vector<string> files;
 						for (auto it = link->getChildren().begin(); it != link->getChildren().end(); it++)
 						{
-							if (it->first.compare(".") == 0 || it->first.compare("..") == 0 || it->second->getType() == FileType::directoryFile || it->second->getType() == FileType::symlinkd)
+							if (it->first.compare(".") == 0 || it->first.compare("..") == 0 || it->second->getType() == FileType::dirFile || it->second->getType() == FileType::symlinkd)
 							{
 								continue;
 							}
@@ -224,7 +243,10 @@ Msg DELCommand(queue<Object> objects)
 						}
 						for (auto file : files)
 						{
-							link->removeChild(file);
+							// NOTE: delete general file
+							link->removeChild(file, FileType::binFile);
+							// NOTE: delete symbol general file
+							link->removeChild(file, FileType::symlink);
 						}
 						result = false;
 					}
@@ -240,10 +262,8 @@ Msg DELCommand(queue<Object> objects)
 			}
 			else
 			{
-				// cout << "TEST: del non-directory file" << endl;
 				if (s_Argument)
 				{
-					// cout << "TEST: s_argument is true" << endl;
 					queue<DirectoryFile*> dirQueue;
 					dirQueue.push(objectParent);
 					while (!dirQueue.empty())
@@ -255,19 +275,25 @@ Msg DELCommand(queue<Object> objects)
 							{
 								continue;
 							}
-							else if (it->second->getType() == FileType::directoryFile)
+							else if (it->second->getType() == FileType::dirFile)
 							{
 								dirQueue.push(static_cast<DirectoryFile*>(it->second));
 							}
 						}
-						_dir->removeChild(objectFileName);
+						// NOTE: delete general file
+						_dir->removeChild(objectFileName, FileType::binFile);
+						// NOTE: delete symbol general file
+						_dir->removeChild(objectFileName, FileType::symlink);
 						dirQueue.pop();
 					}
 				}
 				else
 				{
-					objectParent->removeChild(objectFileName);
-				}			
+					// NOTE: delete general file
+					objectParent->removeChild(objectFileName, FileType::binFile);
+					// NOTE: delete symbol general file
+					objectParent->removeChild(objectFileName, FileType::symlink);
+				}
 			}
 		}
 		objects.pop();

@@ -2,117 +2,155 @@
 #include "Object.h"
 #include "DiskSystem.h"
 
+#include "BinaryFile.h"
+#include "DirectoryFile.h"
+#include "SymlinkFile.h"
+#include "SymlinkdFile.h"
+
+// NOTE: |                           Object Condition                            |
+// NOTE: |-----------------------------------------------------------------------|
+// NOTE: |    path    |  arguments  |     directory    |  file   |  file parent  |
+// NOTE: |------------+-------------+------------------+---------+---------------|
+// NOTE: |   empty    |   whatever  |     whatever     | nullptr |    nullptr    |
+// NOTE: |   size 1   |  arguments  |     directory    |  object | object parent |
+// NOTE: | . in path  |  arguments  |     directory    |    .    |   . parent    |
+// NOTE: | .. in path |  arguments  | directory parent |    ..   |   .. parent   |
+// NOTE: |  symlinkd  |  arguments  |     directory    |  object | object parent |
+
 bool Object::createMode = false;
 
-Object::Object(const Path& path, vector<string> arguments, DirectoryFile* currentDirectory) : m_path(path), m_arguments(arguments)
+bool Object::rdMode = false;
+
+Object::Object(const Path& path, queue<string> arguments, stack<File*> currentDirectory) : m_path(path), m_arguments(arguments), m_currentDirectory(currentDirectory)
 {
-	if (!m_path.m_pathQueue.empty())
+	// NOTE: check m_currentDirectory
+	if (!m_currentDirectory.empty())
 	{
-		auto pathQueue = m_path.m_pathQueue;
-		// NOTE: deal each path
-		while (!pathQueue.empty())
+		auto TEST_DIR = m_currentDirectory;
+		while (!TEST_DIR.empty())
 		{
-			// NOTE: get path str
-			auto _path = pathQueue.front();
-			// NOTE: upward
-			if (_path.compare("..") == 0)
+			TEST_DIR.pop();
+		}
+
+		if (m_path.m_pathQueue.empty())
+		{
+			// NOTE: clear m_currentDirectory or push nullptr?
+			m_currentDirectory.push(nullptr);
+			m_currentDirectory.push(nullptr);
+		}
+		else
+		{
+			auto pathQueue = m_path.m_pathQueue;
+
+			// NOTE: deal each path
+			while (!pathQueue.empty())
 			{
-				// cout << "TEST: path .." << endl;
-				if (currentDirectory->getParent() != DiskSystem::getInstance()->getRootDirectory())
+				// NOTE: get path str
+				auto _path = pathQueue.front();
+				// NOTE: upward
+				if (_path.compare("..") == 0)
 				{
-					currentDirectory = currentDirectory->getParent();
-					// cout << "TEST: current:" << currentDirectory->getName() << endl;
-					if (m_fileParent != nullptr)
+					// NOTE: only left the last one
+					if (m_currentDirectory.size() != 1)
 					{
-						m_fileParent = m_fileParent->getParent();
-						// cout << "TEST: current parent:" << m_fileParent->getName() << endl;
+						m_currentDirectory.pop();
 					}
 				}
+				// NOTE: no change
+				else if (_path.compare(".") == 0)
+				{
+
+				}
+				// NOTE: downward, means path could be found or create
+				// NOTE: path is a general file
+				// NOTE: path is a symbol general file
+				// NOTE: path is a directory file or
+				// NOTE: path is a symbol directory file
 				else
 				{
-					m_fileParent = currentDirectory;
-				}
-			}
-			// NOTE: no change
-			else if (_path.compare(".") == 0)
-			{
-				// cout << "TEST: path ." << endl;
-				if (currentDirectory->getParent() != DiskSystem::getInstance()->getRootDirectory())
-				{
-					currentDirectory = currentDirectory;
-					// cout << "TEST: current:" << currentDirectory->getName() << endl;
-					m_fileParent = currentDirectory->getParent();
-					// cout << "TEST: current parent:" << currentDirectory->getParent()->getName() << endl;
-				}
-				else
-				{
-					m_fileParent = currentDirectory;
-				}
-			}
-			// NOTE: downward
-			else
-			{
-				m_fileParent = currentDirectory;
-				// cout << "TEST: find " << _path << endl;
-				// NOTE: found
-				if (currentDirectory->search(_path) != currentDirectory->getChildren().end())
-				{
-					// cout << "TEST: found" << endl;
-					// NOTE: this is the last one we could found
-					if (createMode && pathQueue.size() == 1)
+					// NOTE: check if it could be access
+					try
 					{
-						// IDEA: or output error message here
-						// cout << "TEST: the last one has been found" << endl;
-						currentDirectory = nullptr;
+						m_currentDirectory.top()->getName();
 					}
+					catch (std::bad_alloc)
+					{
+						m_currentDirectory.top() = nullptr;
+						return;
+					}
+					// NOTE: find directory file
+					if (static_cast<DirectoryFile*>(m_currentDirectory.top())->search(_path, FileType::dirFile) != static_cast<DirectoryFile*>(m_currentDirectory.top())->getChildren().end())
+					{
+						auto dir = static_cast<DirectoryFile*>(m_currentDirectory.top())->search(_path, FileType::dirFile)->second;
+						m_currentDirectory.push(static_cast<DirectoryFile*>(dir));
+					}
+					// NOTE: find symbol directory file
+					else if (static_cast<DirectoryFile*>(m_currentDirectory.top())->search(_path, FileType::symlinkd) != static_cast<DirectoryFile*>(m_currentDirectory.top())->getChildren().end())
+					{
+						// NOTE: treat SymlinkdFile as DirectoryFile
+						auto dir = static_cast<DirectoryFile*>(m_currentDirectory.top())->search(_path, FileType::symlinkd)->second;
+						m_currentDirectory.push(static_cast<DirectoryFile*>(dir));
+					}
+					// NOTE: path is a general file or symbol general file
+					else if (static_cast<DirectoryFile*>(m_currentDirectory.top())->search(_path, FileType::binFile) != static_cast<DirectoryFile*>(m_currentDirectory.top())->getChildren().end() || static_cast<DirectoryFile*>(m_currentDirectory.top())->search(_path, FileType::symlink) != static_cast<DirectoryFile*>(m_currentDirectory.top())->getChildren().end())
+					{
+						auto file = static_cast<DirectoryFile*>(m_currentDirectory.top())->search(_path, FileType::binFile)->second;
+						// NOTE: file parent has been set
+						if (file == nullptr)
+						{
+							// NOTE: file parent has been set
+							file = static_cast<DirectoryFile*>(m_currentDirectory.top())->search(_path, FileType::symlink)->second;
+						}
+
+						m_currentDirectory.push(file);
+						// NOTE: binary file or symlink file couldn't be in path, so I return
+						// IDEA: if pathQueue.size != 1, I can set nullptr here cause a binary file or symlink file is in path
+						return;
+					}
+					// NOTE: path doesn't exist
 					else
 					{
-						currentDirectory = static_cast<DirectoryFile*>(currentDirectory->search(_path)->second);
+						if (createMode)
+						{
+							// NOTE: check name
+							if (_path.find('/') != string::npos ||
+								_path.find('\\') != string::npos ||
+								_path.find(':') != string::npos ||
+								_path.find('*') != string::npos ||
+								_path.find('?') != string::npos ||
+								_path.find('"') != string::npos ||
+								_path.find('<') != string::npos ||
+								_path.find('>') != string::npos ||
+								_path.find('|') != string::npos)
+							{
+								// NOTE: clear current directory
+								while (!m_currentDirectory.empty())
+								{
+									m_currentDirectory.pop();
+								}
+								break;
+							}
+							else
+							{
+								auto childDir = new DirectoryFile(_path);
+								static_cast<DirectoryFile*>(m_currentDirectory.top())->addChild(childDir);
+								m_currentDirectory.push(childDir);
+							}
+						}
+						else
+						{
+							// NOTE: push a nullptr
+							m_currentDirectory.push(nullptr);
+							break;
+						}
 					}
 				}
-				// NOTE: lost
-				else
-				{
-					// cout << "TEST: lost" << endl;
-					// cout << "TEST: create mode:" << createMode << endl;
-					if (createMode)
-					{
-						// cout << "TEST: in lost currentDirectory:" << currentDirectory->getName() << endl;
-						auto childDir = new DirectoryFile(_path);
-						currentDirectory->addChild(childDir);
-						currentDirectory = childDir;
-					}
-					else
-					{
-						currentDirectory = nullptr;
-						break;
-					}
-				}
+				pathQueue.pop();
 			}
-			pathQueue.pop();
 		}
 	}
 	else
 	{
-		// cout << "TEST: Empty File!" << endl;
-	}
-
-	m_file = currentDirectory;
-
-	if (m_file != nullptr)
-	{
-		// cout << "TEST: Object.file:" << m_file->getName() << endl;
-	}
-	else
-	{
-		// cout << "TEST: m_file is nullptr" << endl;
-	}
-	if (m_fileParent != nullptr)
-	{
-		// cout << "TEST: Object.fileParent:" << m_fileParent->getName() << endl;
-	}
-	else
-	{
-		// cout << "TEST: m_fileParent is nullptr" << endl;
+		// NOTE: output error message here?
 	}
 }

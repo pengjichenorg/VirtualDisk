@@ -1,14 +1,13 @@
 #include "stdafx.h"
-#include "SymbolGeneralFile.h"
+#include "SymlinkFile.h"
 
-
-SymbolGeneralFile::SymbolGeneralFile()
+SymlinkFile::SymlinkFile()
 {
 	m_type = FileType::symlink;
 	m_typeString = "<SYMLINK>       ";
 }
 
-SymbolGeneralFile::SymbolGeneralFile(const string& name, GeneralFile* link) : GeneralFile(name)
+SymlinkFile::SymlinkFile(const string& name, BinaryFile* link) : BinaryFile(name)
 {
 	m_type = FileType::symlink;
 	m_typeString = "<SYMLINK>       ";
@@ -19,7 +18,7 @@ SymbolGeneralFile::SymbolGeneralFile(const string& name, GeneralFile* link) : Ge
 	}
 }
 
-SymbolGeneralFile::SymbolGeneralFile(vector<string> infos)
+SymlinkFile::SymlinkFile(vector<string> infos)
 {
 	m_date = infos[0];
 	m_time = infos[1];
@@ -32,20 +31,18 @@ SymbolGeneralFile::SymbolGeneralFile(vector<string> infos)
 	m_typeString = "<SYMLINK>       ";
 }
 
-SymbolGeneralFile::~SymbolGeneralFile()
+SymlinkFile::~SymlinkFile()
 {
-	// cout << "TEST: release file:" << m_name << " in " << __FUNCTION__ << endl;
-
-	// dont delete
+	// NOTE: dont delete
 	m_link = nullptr;
 }
 
-GeneralFile* SymbolGeneralFile::getLinkFile() const
+BinaryFile* SymlinkFile::getLinkFile() const
 {
 	return m_link;
 }
 
-void SymbolGeneralFile::setLinkFile(GeneralFile* link)
+void SymlinkFile::setLinkFile(BinaryFile* link)
 {
 	m_link = link;
 	m_info = "[" + m_link->getName() + "]";

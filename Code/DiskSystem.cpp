@@ -1,6 +1,10 @@
 #include "stdafx.h"
 #include "DiskSystem.h"
 
+#include "BinaryFile.h"
+#include "SymlinkFile.h"
+#include "SymlinkdFile.h"
+
 DiskSystem* DiskSystem::m_instance = nullptr;
 
 DiskSystem* DiskSystem::getInstance()
@@ -38,42 +42,23 @@ void DiskSystem::setRootDirectory(DirectoryFile* root)
 DiskSystem::DiskSystem()
 {
 	m_rootDirectory = new DirectoryFile("root");
-	m_rootDirectory->addChild(new DirectoryFile("C:"));
 
-	// test
-	// C:
-	// [DIR] E1
-	//       E1.txt
-	// C:\E1
-	// [DIR] E11
-	//       E11.txt
+	// NOTE: for test
+	auto C_Directory = new DirectoryFile("C:");
+	auto E1_Directory = new DirectoryFile("E1");
+	auto E11_Directory = new DirectoryFile("E11");
+	auto E1_Binary = new BinaryFile("E1.txt");
+	auto E11_Binary = new BinaryFile("E11.txt");
+	auto E1L_LINKD = new SymlinkdFile("E1L", E1_Directory);
+	auto E11L_LINKD = new SymlinkdFile("E11L", E11_Directory);
 
-	// C:\E1
-	static_cast<DirectoryFile*>(m_rootDirectory->search("C:")->second)->addChild(new DirectoryFile("E1"));
-	// C:\E1.txt
-	static_cast<DirectoryFile*>(m_rootDirectory->search("C:")->second)->addChild(new GeneralFile("E1.txt"));
-	// C:\E1\E11
-	static_cast<DirectoryFile*>(static_cast<DirectoryFile*>(m_rootDirectory->search("C:")->second)->search("E1")->second)->addChild(new DirectoryFile("E11"));
-	// C:\E1\E11.txt
-	static_cast<DirectoryFile*>(static_cast<DirectoryFile*>(m_rootDirectory->search("C:")->second)->search("E1")->second)->addChild(new GeneralFile("E11.txt"));
-	// C:\E1L [E1]
-	auto E1Dir = static_cast<DirectoryFile*>(static_cast<DirectoryFile*>(m_rootDirectory->search("C:")->second)->search("E1")->second);
-	auto E1L = new SymbolDirectoryFile("E1L", E1Dir);
-	static_cast<DirectoryFile*>(static_cast<DirectoryFile*>(static_cast<DirectoryFile*>(m_rootDirectory->search("C:")->second)->search("E1")->second)->search("E11")->second)->addChild(E1L);
-
-	// C:\E1\EE1LL [E1L]
-	auto E1LL = new SymbolDirectoryFile("E1LL", E1L);
-	static_cast<DirectoryFile*>(m_rootDirectory->search("C:")->second)->addChild(E1LL);
-
-	// test
-	// cout << m_rootDirectory->getName() << endl;
-	// cout << m_rootDirectory->search("C:")->second->getName() << endl;
-	// cout << "C:\\" << static_cast<DirectoryFile*>(m_rootDirectory->search("C:")->second)->search("E1")->second->getName() << endl;
-	// cout << "C:\\" << static_cast<DirectoryFile*>(m_rootDirectory->search("C:")->second)->search("E1.txt")->second->getName() << endl;
-	// cout << "C:\\" << static_cast<DirectoryFile*>(m_rootDirectory->search("C:")->second)->search("E1LL")->second->getName() << endl;
-	// cout << "C:\\E1\\" << static_cast<DirectoryFile*>(static_cast<DirectoryFile*>(m_rootDirectory->search("C:")->second)->search("E1")->second)->search("E11")->second->getName() << endl;
-	// cout << "C:\\E1\\" << static_cast<DirectoryFile*>(static_cast<DirectoryFile*>(m_rootDirectory->search("C:")->second)->search("E1")->second)->search("E11.txt")->second->getName() << endl;
-	// cout << "C:\\E1\\" << static_cast<DirectoryFile*>(static_cast<DirectoryFile*>(static_cast<DirectoryFile*>(m_rootDirectory->search("C:")->second)->search("E1")->second)->search("E11")->second)->search("E1L")->second->getName() << endl;
+	m_rootDirectory->addChild(C_Directory);
+	C_Directory->addChild(E1_Directory);
+	C_Directory->addChild(E1_Binary);
+	E1_Directory->addChild(E11_Directory);
+	E1_Directory->addChild(E11_Binary);
+	E11_Directory->addChild(E1L_LINKD);
+	E11_Directory->addChild(E11L_LINKD);
 }
 
 DiskSystem::~DiskSystem()

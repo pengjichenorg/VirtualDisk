@@ -1,21 +1,20 @@
 #pragma once
 
 #include "Object.h"
-#include "ObjectGenerator.h"
 
 #include <queue>
-#include <string>
+#include <stack>
 
 using namespace std;
 
 class StringParserCmd
 {
 public:
-	StringParserCmd(const queue<string>& strings, DirectoryFile* currentDirectory);
+	StringParserCmd(const queue<string>& strings, stack<File*> currentDirectory);
 	virtual ~StringParserCmd();
 	virtual queue<Object> getObjects() = 0;
 protected:
 	queue<string> m_strings;
-	DirectoryFile* m_currentDirectory;
+	stack<File*> m_currentDirectory;
 };
 

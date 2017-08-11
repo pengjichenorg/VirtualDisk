@@ -1,14 +1,13 @@
 #pragma once
 
-#include <string>
-#include <vector>
-#include <queue>
-#include <functional>
-#include <unordered_map>
-
 #include "Msg.h"
 #include "Object.h"
 #include "DirectoryFile.h"
+
+#include <string>
+#include <queue>
+#include <functional>
+#include <unordered_map>
 
 using namespace std;
 
@@ -42,12 +41,12 @@ private:
 		{ "rd", &RDCommand },
 		{ "cd", &CDCommand },
 		{ "del", &DELCommand },
-		{ "copy", &COPYCommand},
+		{ "copy", &COPYCommand },
 		{ "ren", &RENCommand },
 		{ "move", &MOVECommand },
 		{ "mklink", &MKLINKCommand },
-		{ "save", &SAVECommand},
-		{ "load", &LOADCommand},
+		{ "save", &SAVECommand },
+		{ "load", &LOADCommand },
 		{ "cls", &CLSCommand },
 		{ "touch", &TOUCHCommand }
 	};

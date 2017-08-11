@@ -1,19 +1,19 @@
 #include "stdafx.h"
-#include "GeneralFile.h"
+#include "BinaryFile.h"
 
 #include <fstream>
 
-GeneralFile::GeneralFile()
+BinaryFile::BinaryFile()
 {
 }
 
-GeneralFile::GeneralFile(const string& name) : File(name)
+BinaryFile::BinaryFile(const string& name) : File(name)
 {
-	m_type = FileType::generalFile;
+	m_type = FileType::binFile;
 	m_typeString = "      ";
 }
 
-GeneralFile::GeneralFile(vector<string> infos)
+BinaryFile::BinaryFile(vector<string> infos)
 {
 	m_date = infos[0];
 	m_time = infos[1];
@@ -22,10 +22,8 @@ GeneralFile::GeneralFile(vector<string> infos)
 	m_type = FileType(std::atoi(infos[4].c_str()));
 	m_info = infos[5];
 
-	// TODO: read data
 	auto dataFile = infos[7];
 
-	// cout << "TEST: " << dataFile << endl;
 	if (dataFile.compare("nullptr") != 0)
 	{
 		ifstream inputFile;
@@ -41,22 +39,22 @@ GeneralFile::GeneralFile(vector<string> infos)
 		m_size = m_bin.size();
 	}
 
-	m_type = FileType::generalFile;
+	m_type = FileType::binFile;
 	m_typeString = "      ";
 }
 
 
-GeneralFile::~GeneralFile()
+BinaryFile::~BinaryFile()
 {
-	// cout << "TEST: release file:" << m_name << " in " << __FUNCTION__ << endl;
+
 }
 
-vector<unsigned char> GeneralFile::getBinData() const
+vector<unsigned char> BinaryFile::getBinData() const
 {
 	return m_bin;
 }
 
-void GeneralFile::setBinData(const vector<unsigned char>& bin)
+void BinaryFile::setBinData(const vector<unsigned char>& bin)
 {
 	m_bin = bin;
 	m_size = m_bin.size();

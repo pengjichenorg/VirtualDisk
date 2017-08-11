@@ -1,11 +1,11 @@
 #include "stdafx.h"
 #include "CommandFactory.h"
 
+#include <queue>
 
 CommandFactory::CommandFactory()
 {
 }
-
 
 CommandFactory::~CommandFactory()
 {
@@ -14,11 +14,9 @@ CommandFactory::~CommandFactory()
 function<Msg(queue<Object> objects)>& CommandFactory::createCommand(const string& command)
 {
 	auto it = m_commandTable.find(command);
-	// cout << "TEST: command:" << command << endl;
-	if (it == m_commandTable.end()) {
-		// cout << "TEST: command lost" << endl;
+	if (it == m_commandTable.end())
+	{
 		return error;
 	}
-	// cout << "TEST: command found:" << endl;
 	return it->second;
 }

@@ -1725,7 +1725,7 @@ namespace tinyxml2
 		XMLAttribute* last = 0;
 		XMLAttribute* attrib = 0;
 		for (attrib = _rootAttribute;
-			attrib;
+		attrib;
 			last = attrib, attrib = attrib->_next) {
 			if (XMLUtil::StringEqual(attrib->Name(), name)) {
 				break;
@@ -2104,7 +2104,7 @@ namespace tinyxml2
 	// types sizes relate to each other.
 	template
 		<bool = (sizeof(unsigned long) >= sizeof(size_t))>
-		struct LongFitsIntoSizeTMinusOne {
+	struct LongFitsIntoSizeTMinusOne {
 		static bool Fits(unsigned long value)
 		{
 			return value < (size_t)-1;

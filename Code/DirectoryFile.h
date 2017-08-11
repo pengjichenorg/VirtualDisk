@@ -1,8 +1,8 @@
 #pragma once
+
 #include "File.h"
 
 #include <map>
-#include <string>
 #include <vector>
 
 using namespace std;
@@ -18,12 +18,10 @@ public:
 	DirectoryFile(vector<string> infos);
 	virtual ~DirectoryFile();
 
-	DirectoryFile* getParent() const;
-
-	void addChild(File* file);
-	void removeChild(const string& name);
-	map<string, File*>& getChildren();
-	ChildIterator search(const string& name);
+	virtual void addChild(File* file);
+	virtual void removeChild(const string& name, FileType type);
+	virtual map<string, File*>& getChildren();
+	virtual ChildIterator search(const string& name, FileType type);
 
 protected:
 	map<string, File*> m_children;

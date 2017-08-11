@@ -1,12 +1,13 @@
 #include "stdafx.h"
 #include "CommandFactory.h"
 #include "ErrorMessage.h"
-#include "DiskSystem.h"
 
-#include "GeneralFile.h"
+#include "BinaryFile.h"
 #include "DirectoryFile.h"
-#include "SymbolGeneralFile.h"
-#include "SymbolDirectoryFile.h"
+#include "SymlinkFile.h"
+#include "SymlinkdFile.h"
+
+#include "DiskSystem.h"
 
 #include "tinyxml2.h"
 
@@ -18,19 +19,19 @@ DirectoryFile* TraverseXML(XMLElement* element);
 
 static XMLDocument *pDoc = nullptr;
 
-GeneralFile* createGF(XMLElement* element);
+BinaryFile* createBF(XMLElement* element);
 
 DirectoryFile* createDF(XMLElement* element);
 
-SymbolGeneralFile* createSGF(XMLElement* element);
+SymlinkFile* createSBF(XMLElement* element);
 
-SymbolDirectoryFile* createSDF(XMLElement* element);
+SymlinkdFile* createSDF(XMLElement* element);
 
 Msg LOADCommand(queue<Object> objects)
 {
 	if (objects.size() != 1)
 	{
-		return Msg(false, errorSyntaxMessage, nullptr);
+		return Msg(false, errorSyntaxMessage, stack<File*>());
 	}
 
 	auto path = objects.front().m_path.m_pathQueue;
@@ -41,27 +42,20 @@ Msg LOADCommand(queue<Object> objects)
 		path.pop();
 	}
 
-	// pathString = "@\\X:\\vd.xml";
-
-	// cout << "TEST: path string:" << pathString.substr(2) << endl;
-
 	DirectoryFile* root = nullptr;
 
 	// NOTE: create xml doc
-	// cout << "TEST: create xml doc" << endl;
 	pDoc = new XMLDocument();
-		
+
 	XMLError errorId = pDoc->LoadFile(pathString.substr(2).c_str());
 
 	if (errorId != 0)
 	{
 		// NOTE: xml format error
-		return Msg(false, "xml format error", nullptr);
+		return Msg(false, "xml format error", stack<File*>());
 	}
 
 	XMLElement* rootElement = pDoc->RootElement();
-
-	// cout << "TEST: root element:" << rootElement->Value() << endl;
 
 	root = TraverseXML(rootElement);
 
@@ -73,13 +67,11 @@ Msg LOADCommand(queue<Object> objects)
 	fileQueue.push(root);
 	while (!fileQueue.empty())
 	{
-		// cout << "TEST: name:" << fileQueue.front()->getName() << endl;
-		if (fileQueue.front()->getType() == FileType::directoryFile)
+		if (fileQueue.front()->getType() == FileType::dirFile)
 		{
 			for (auto it = static_cast<DirectoryFile*>(fileQueue.front())->getChildren().begin();
-				it != static_cast<DirectoryFile*>(fileQueue.front())->getChildren().end(); it++)
+			it != static_cast<DirectoryFile*>(fileQueue.front())->getChildren().end(); it++)
 			{
-				// cout << "TEST: child:" << it->first << endl;
 				if (it->first.compare(".") == 0 || it->first.compare("..") == 0)
 				{
 					continue;
@@ -92,40 +84,41 @@ Msg LOADCommand(queue<Object> objects)
 
 	delete pDoc;
 
-	return Msg(true, "", static_cast<DirectoryFile*>(root->search(initPartition)->second));
+	stack<File*> currentDirectory;
+
+	currentDirectory.push(static_cast<DirectoryFile*>(root->search(initPartition, FileType::dirFile)->second));
+
+	return Msg(true, "", currentDirectory);
 }
 
 DirectoryFile* TraverseXML(XMLElement* element)
 {
 	DirectoryFile* father = createDF(element);
-	// cout << "TEST: create father:" << element->FirstChildElement("name")->GetText() << endl;
 	if (element->FirstChildElement("File") == nullptr)
 	{
-		// cout << "TEST: empty dir" << endl;
 		return father;
 	}
 	else
 	{
 		for (auto directory = element->FirstChildElement("File"); directory != nullptr; directory = directory->NextSiblingElement("File"))
 		{
-			// cout << "TEST: child:" << directory->FirstChildElement("name")->GetText() << endl;
 			// NOTE: create xml element as fater's children
 			File* child = nullptr;
 			switch (atoi(directory->FirstChildElement("type")->GetText()))
 			{
-			case FileType::generalFile:
+			case FileType::binFile:
 			{
-				child = createGF(directory);
+				child = createBF(directory);
 				break;
 			}
-			case FileType::directoryFile:
+			case FileType::dirFile:
 			{
 				child = TraverseXML(directory);
 				break;
 			}
 			case FileType::symlink:
 			{
-				child = createSGF(directory);
+				child = createSDF(directory);
 				break;
 			}
 			case FileType::symlinkd:
@@ -134,15 +127,13 @@ DirectoryFile* TraverseXML(XMLElement* element)
 				break;
 			}
 			}
-			// cout << "TEST: child:" << child->getName() << endl;
-			// cout << "TEST: father:" << father->getName() << endl;
 			father->addChild(child);
 		}
 		return father;
 	}
 }
 
-GeneralFile* createGF(XMLElement* element)
+BinaryFile* createBF(XMLElement* element)
 {
 	assert(string(element->FirstChildElement("type")->GetText()).compare("1") == 0);
 
@@ -157,17 +148,15 @@ GeneralFile* createGF(XMLElement* element)
 		if (file->GetText() != nullptr)
 		{
 			infos.push_back(file->GetText());
-			// cout << "TEST: " << file->GetText() << endl;
 		}
 		else
 		{
 			infos.push_back(" ");
-			// cout << "TEST: empty text" << endl;
 		}
 		file = file->NextSiblingElement();
 	}
 
-	return new GeneralFile(infos);
+	return new BinaryFile(infos);
 }
 
 DirectoryFile* createDF(XMLElement* element)
@@ -185,22 +174,18 @@ DirectoryFile* createDF(XMLElement* element)
 		if (file->GetText() != nullptr)
 		{
 			infos.push_back(file->GetText());
-			// cout << "TEST: " << file->GetText() << endl;
-		}		
+		}
 		else
 		{
 			infos.push_back(" ");
-			// cout << "TEST: empty text" << endl;
 		}
 		file = file->NextSiblingElement();
 	}
 
-	// cout << "TEST: here" << endl;
-
 	return new DirectoryFile(infos);
 }
 
-SymbolGeneralFile* createSGF(XMLElement* element)
+SymlinkFile* createSBF(XMLElement* element)
 {
 	assert(string(element->FirstChildElement("type")->GetText()).compare("2") == 0);
 
@@ -215,20 +200,18 @@ SymbolGeneralFile* createSGF(XMLElement* element)
 		if (file->GetText() != nullptr)
 		{
 			infos.push_back(file->GetText());
-			// cout << "TEST: " << file->GetText() << endl;
 		}
 		else
 		{
 			infos.push_back(" ");
-			// cout << "TEST: empty text" << endl;
 		}
 		file = file->NextSiblingElement();
 	}
 
-	return new SymbolGeneralFile(infos);
+	return new SymlinkFile(infos);
 }
 
-SymbolDirectoryFile* createSDF(XMLElement* element)
+SymlinkdFile* createSDF(XMLElement* element)
 {
 	assert(string(element->FirstChildElement("type")->GetText()).compare("3") == 0);
 
@@ -243,15 +226,13 @@ SymbolDirectoryFile* createSDF(XMLElement* element)
 		if (file->GetText() != nullptr)
 		{
 			infos.push_back(file->GetText());
-			// cout << "TEST: " << file->GetText() << endl;
 		}
 		else
 		{
 			infos.push_back(" ");
-			// cout << "TEST: empty text" << endl;
 		}
 		file = file->NextSiblingElement();
 	}
 
-	return new SymbolDirectoryFile(infos);
+	return new SymlinkdFile(infos);
 }

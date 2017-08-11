@@ -1,15 +1,15 @@
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "Path.h"
 #include "DirectoryFile.h"
+
+#include <vector>
+#include <stack>
 
 class ObjectGenerator
 {
 public:
-	ObjectGenerator(const string& objectStr, DirectoryFile* currentDirectory);
+	ObjectGenerator(const string& objectStr, stack<File*> currentDirectory);
 	~ObjectGenerator();
 
 	vector<string> getObjects();

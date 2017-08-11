@@ -7,7 +7,7 @@ VDos::VDos()
 {
 	m_stringParser = new StringParser();
 	m_commandFactory = new CommandFactory();
-	m_currentDirectory = static_cast<DirectoryFile*>(DiskSystem::getInstance()->getRootDirectory()->search(initPartition)->second);
+	m_currentDirectory.push(static_cast<DirectoryFile*>(DiskSystem::getInstance()->getRootDirectory()->search(initPartition, FileType::dirFile)->second));
 	VDos::_path.push(initPartition);
 }
 
@@ -64,51 +64,56 @@ void VDos::run()
 
 		if (msg.m_successful)
 		{
-			// cout << "TEST: execute command successfully" << endl;
-			if (msg.m_directoryFile != nullptr)
+			// NOTE: if stack's top is not nullptr
+			if (!msg.m_directoryFile.empty())
 			{
-				m_currentDirectory = msg.m_directoryFile;
-			}
-			// NOTE: for 'cd'
-			if (m_stringParser->getCommand().compare("cd") == 0 && msg.m_msg.compare(".") == 0)
-			{
-				string path;
-				auto dir = m_currentDirectory;
-				while (dir != DiskSystem::getInstance()->getRootDirectory()) {
-					if (path.empty())
-					{
-						path = dir->getName();
-					}
-					else
-					{
-						path = dir->getName() + "\\" + path;
-					}
-					dir = dir->getParent();
+				if (msg.m_directoryFile.top() != nullptr)
+				{
+					// NOTE: then change current
+					m_currentDirectory = msg.m_directoryFile;
 				}
-				cout << path << "\n" << endl;
 			}
+			else
+			{
+				// NOTE: for 'cd'
+				if (m_stringParser->getCommand().compare("cd") == 0 && msg.m_msg.compare(".") == 0)
+				{
+					string path;
+					auto currentDirectoryCopy = m_currentDirectory;
+
+					while (!currentDirectoryCopy.empty())
+					{
+						if (path.empty())
+						{
+							path = currentDirectoryCopy.top()->getName();
+						}
+						else
+						{
+							path = currentDirectoryCopy.top()->getName() + "\\" + path;
+						}
+						currentDirectoryCopy.pop();
+					}
+					cout << path << "\n" << endl;
+				}
+			}
+
 		}
 		else
 		{
-			// cout << "TEST: execute command failed" << endl;
 			cout << msg.m_msg << endl;
 		}
 
 		// NOTE: clear string parser
 		m_stringParser->clear();
-
-		// cout << "TEST: while end" << endl;
 	}
-
-	// cout << "TEST: run end" << endl;
 }
 
-void VDos::setCurrentDirectory(DirectoryFile* currentDirectory)
+void VDos::setCurrentDirectory(stack<File*> currentDirectory)
 {
 	m_currentDirectory = currentDirectory;
 }
 
-DirectoryFile* VDos::getCurrentDirectory()
+stack<File*> VDos::getCurrentDirectory()
 {
 	return m_currentDirectory;
 }
@@ -116,22 +121,21 @@ DirectoryFile* VDos::getCurrentDirectory()
 string VDos::getCurrentPath()
 {
 	string currentPath;
+
 	auto pathCopy = VDos::_path;
-	// cout << "TEST: _path size:" << _path.size() << endl;
+
 	while (!pathCopy.empty())
 	{
-		// cout << "TEST:" << pathCopy.top() << endl;
 		currentPath = pathCopy.top() + "\\" + currentPath;
 		pathCopy.pop();
 	}
-	if (_path.size() != 1)
+
+	if (VDos::_path.size() != 1)
 	{
 		if (currentPath.empty())
 		{
-			// cout << "TEST: current path is empty" << endl;
 			// NOTE: for cd \E1LL after rd /s E1
 			currentPath = initPartition + "\\";
-
 		}
 		else
 		{
@@ -139,5 +143,6 @@ string VDos::getCurrentPath()
 		}
 	}
 	currentPath = currentPath + ">";
+
 	return currentPath;
 }

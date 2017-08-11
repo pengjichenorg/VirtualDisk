@@ -1,8 +1,14 @@
 #include "stdafx.h"
 #include "StringParserCmd2.h"
 #include "DiskSystem.h"
+#include "ObjectGenerator.h"
 
-StringParserCmd2::StringParserCmd2(const queue<string>& strings, DirectoryFile* currentDirectory) : StringParserCmd(strings, currentDirectory)
+// NOTE: in cmd2, string which has '/' is argumentString, others are objectString
+// NOTE: if there is no objectString, then treat all arguments as path
+// NOTE: there is a special condition, that is, 'cmd /arg dir/dir', when it comes, treat all arguments as path
+// NOTE: on the other hand, '/' must at first position in each string, otherwise, string which has '/' is path
+
+StringParserCmd2::StringParserCmd2(const queue<string>& strings, stack<File*> currentDirectory) : StringParserCmd(strings, currentDirectory)
 {
 }
 
@@ -12,146 +18,160 @@ StringParserCmd2::~StringParserCmd2()
 
 queue<Object> StringParserCmd2::getObjects()
 {
-	// cout << "TEST: return queue with 2 objects" << endl;
-	queue<Object> objects;
-
 	// NOTE: no arguments and objects
 	if (m_strings.empty())
 	{
 		return queue<Object>();
 	}
-
-	// NOTE: get all objectStr
-	vector<string> objectStrings;
-	vector<string> arguments;
+	// NOTE: final objects
+	queue<Object> objects;
+	// NOTE: if objectStrings is empty, then treat /arg as object
+	queue<string> objectStrings;
+	// NOTE: save all arguments, use in special condition
+	queue<string> allArgumentStrings;
+	// NOTE: arguments for an object
+	queue<string> argumentStrings;
 
 	// NOTE: get strings
 	while (!m_strings.empty())
 	{
-		auto objectStr = m_strings.front();
+		// NOTE: get a string
+		auto str = m_strings.front();
 
 		// NOTE: get arguments
-		if (objectStr.find('/') != string::npos)
+		if (str.find('/') != string::npos)
 		{
-			arguments.push_back(objectStr);
+			argumentStrings.push(str);
+			allArgumentStrings.emplace(str);
 		}
 		// NOTE: get object
 		else
 		{
-			Path path = objectStr;
-			auto objString = path.m_pathQueue.back();
-			// NOTE: only if object has wildcard
-			if (objString.find('*') != string::npos || objString.find('?') != string::npos)
-			{
-				// NOTE: generate a temporary object to get object's directory
-				Object obj(path, arguments, m_currentDirectory);
+			// NOTE: split str
+			Path path = str;
+			// NOTE: get object string
+			auto objectString = path.m_pathQueue.back();
 
-				// cout << "TEST: wildcard object parent directory:" << (obj.m_fileParent != nullptr ? obj.m_fileParent->getName() : "nullptr") << endl;
+			// NOTE: objectString has wildcard
+			if (objectString.find('*') != string::npos || objectString.find('?') != string::npos)
+			{
+				Object tempObj(path, argumentStrings, m_currentDirectory);
+
+				// NOTE: get parent in stack
+				auto parent = tempObj.m_currentDirectory;
+				parent.pop();
 
 				// NOTE: ensure that directory could be found
-				if (obj.m_fileParent != nullptr)
+				if (parent.top() != nullptr)
 				{
-					ObjectGenerator objectGenerator(objString, static_cast<DirectoryFile*>(obj.m_fileParent));
-					for (auto s : objectGenerator.getObjects())
+					ObjectGenerator objectGenerator(objectString, parent);
+					for (auto o : objectGenerator.getObjects())
 					{
 						Path _path = path;
-						_path.m_pathQueue.back() = s;
-						objects.emplace(_path, arguments, m_currentDirectory);
+						_path.m_pathQueue.back() = o;
+						objects.emplace(o, argumentStrings, parent);
 					}
-					objectStrings.push_back(objectStr);
-					arguments.clear();
 				}
 				// NOTE: if directory could not be found, objects will be empty
 			}
-			// NOTE: object doesnt have wildcard
+			// NOTE: objectString doesn't have wildcard
 			else
 			{
 				// NOTE: from partition
 				if (path.m_pathQueue.front().compare(initPartition) == 0)
 				{
-					// cout << "TEST: from partition" << endl;
-					objects.emplace(path, arguments, DiskSystem::getInstance()->getRootDirectory());
+					// QUESTION: why I use root directory here?
+					stack<File*> dir;
+					dir.push(DiskSystem::getInstance()->getRootDirectory());
+					// NOTE: if I use init partition here
+					// dir.push(DiskSystem::getInstance()->getRootDirectory()->search(initPartition, FileType::dirFile)->second);
+					objects.emplace(path, argumentStrings, dir);
 				}
 				// NOTE: not from partition
 				else
 				{
-					// cout << "TEST: isn't from partition" << endl;
-					objects.emplace(path, arguments, m_currentDirectory);
+					objects.emplace(path, argumentStrings, m_currentDirectory);
 				}
-				objectStrings.push_back(objectStr);
-
-				// NOTE: different arguments to different objects
-				arguments.clear();
+			}
+			objectStrings.emplace(str);
+			// NOTE: clear arguments for next object
+			while (!argumentStrings.empty())
+			{
+				argumentStrings.pop();
 			}
 		}
 		m_strings.pop();
 	}
 
 	// NOTE: for command have arguments without objects like "copy /f1 /f2", treat it as directory
-	if (!arguments.empty() && objectStrings.empty())
+	if (!allArgumentStrings.empty() && objectStrings.empty())
 	{
 		// NOTE: change '/' to '\'
-		for (auto& s : arguments)
+		while (!allArgumentStrings.empty())
 		{
-			while (s.find('/') != string::npos)
+			while (allArgumentStrings.front().find('/') != string::npos)
 			{
-				s[s.find('/')] = '\\';
+				allArgumentStrings.front()[allArgumentStrings.front().find('/')] = '\\';
 			}
-			// cout << "TEST: s = " << s << endl;
+			objectStrings.emplace(allArgumentStrings.front());
+			allArgumentStrings.pop();
 		}
-		// NOTE: deal each one
-		for (auto s : arguments)
+
+		// NOTE: each object
+		while (!objectStrings.empty())
 		{
-			// cout << "TEST: s = " << s << endl;
+			auto objectString = objectStrings.front();
 
-			vector<string> emptyArguments;
+			// NOTE: get object
+			Path path = objectString;
+			// NOTE: get object from path
+			auto objStr = path.m_pathQueue.back();
 
-			Path path = s;
-			auto objString = path.m_pathQueue.back();
 			// NOTE: only if object has wildcard
-			if (objString.find('*') != string::npos || objString.find('?') != string::npos)
+			if (objStr.find('*') != string::npos || objStr.find('?') != string::npos)
 			{
 				// NOTE: generate a temporary object to get object's directory
-				Object obj(path, emptyArguments, m_currentDirectory);
+				Object tempObj(path, argumentStrings, m_currentDirectory);
 
-				// cout << "TEST: wildcard object parent directory:" << (obj.m_fileParent != nullptr ? obj.m_fileParent->getName() : "nullptr") << endl;
+				// NOTE: get parent in stack
+				auto parent = tempObj.m_currentDirectory;
+				parent.pop();
 
 				// NOTE: ensure that directory could be found
-				if (obj.m_fileParent != nullptr)
+				if (parent.top() != nullptr)
 				{
-					ObjectGenerator objectGenerator(objString, static_cast<DirectoryFile*>(obj.m_fileParent));
-					for (auto str : objectGenerator.getObjects())
+					ObjectGenerator objectGenerator(objectString, tempObj.m_currentDirectory);
+					for (auto o : objectGenerator.getObjects())
 					{
 						Path _path = path;
-						_path.m_pathQueue.back() = str;
-						objects.emplace(_path, emptyArguments, m_currentDirectory);
+						_path.m_pathQueue.back() = o;
+						objects.emplace(_path, argumentStrings, parent);
 					}
-					objectStrings.push_back(s);
-					emptyArguments.clear();
 				}
 				// NOTE: if directory could not be found, objects will be empty
 			}
-			// NOTE: object doesnt have wildcard
+			// NOTE: objectString doesn't have wildcard
 			else
 			{
 				// NOTE: from partition
 				if (path.m_pathQueue.front().compare(initPartition) == 0)
 				{
-					// cout << "TEST: from partition" << endl;
-					objects.emplace(path, arguments, DiskSystem::getInstance()->getRootDirectory());
+					// QUESTION: why I use root directory here?
+					stack<File*> dir;
+					// dir.push(DiskSystem::getInstance()->getRootDirectory());
+					// NOTE: if I use init partition here, then i should pop path
+					dir.push(DiskSystem::getInstance()->getRootDirectory()->search(initPartition, FileType::dirFile)->second);
+					path.m_pathQueue.pop();
+					objects.emplace(path, argumentStrings, dir);
 				}
 				// NOTE: not from partition
 				else
 				{
-					// cout << "TEST: isn't from partition" << endl;
-					objects.emplace(path, arguments, m_currentDirectory);
+					objects.emplace(path, argumentStrings, m_currentDirectory);
 				}
-				// NOTE: meaning?
-				objectStrings.push_back(s);
-
-				// NOTE: different arguments to different objects
-				emptyArguments.clear();
 			}
+
+			objectStrings.pop();
 		}
 	}
 

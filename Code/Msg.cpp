@@ -1,13 +1,12 @@
 #include "stdafx.h"
 #include "Msg.h"
 
-Msg::Msg(bool successful, string msg, DirectoryFile* directoryFile) : m_msg(msg)
+Msg::Msg(bool successful, string msg, stack<File*> directoryFile) : m_msg(msg), m_directoryFile(directoryFile)
 {
 	m_successful = successful;
-	m_directoryFile = directoryFile;
 }
 
 Msg::~Msg()
 {
-	m_directoryFile = nullptr;
+
 }
